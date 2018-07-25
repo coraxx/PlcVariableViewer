@@ -47,20 +47,20 @@
 		</Style>
 	</Window.Resources>
 
-	<Grid>
+	<Grid Background="{StaticResource BackgroundBrush}">
 		<Grid.RowDefinitions>
-			<RowDefinition Height="30"/>
+			<RowDefinition Height="35"/>
 			<RowDefinition Height="*"/>
 		</Grid.RowDefinitions>
 		<Grid Grid.Row="0" >
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="*"/>
-				<ColumnDefinition Width="50"/>
+				<ColumnDefinition Width="60"/>
 			</Grid.ColumnDefinitions>
-			<TextBox x:Name="TextBox1" Grid.Column="0" Height="20" KeyUp="TextBox1_OnKeyUp" Margin="2"/>
-			<Button Grid.Column="1" Content="Filter" Height="20" Margin="2" Click="ButtonBase_OnClick"/>
+			<TextBox x:Name="TextBox1" Grid.Column="0" Height="20" KeyUp="TextBox1_OnKeyUp" Margin="10,10,5,0" Background="{StaticResource BackgroundLightBrush}"/>
+			<Button Grid.Column="1" Content="Filter" Height="20" Margin="5,10,10,0" Click="ButtonBase_OnClick"/>
 		</Grid>
-		<ListView x:Name="SymbolListView" Grid.Row="1" SelectionMode="Single" Style="{x:Null}" Margin="10" Background="{StaticResource BackgroundLightBrush}"
+		<ListView x:Name="SymbolListView" Grid.Row="1" SelectionMode="Single" Style="{x:Null}" Margin="10,5,10,10" Background="{StaticResource BackgroundLightBrush}"
 		          ItemContainerStyle="{StaticResource ListViewItemStyle}" ItemsSource="{Binding SymbolListViewItems}">
 			<ListView.View>
 				<GridView>

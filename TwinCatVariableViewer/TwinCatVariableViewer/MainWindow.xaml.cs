@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -23,7 +24,7 @@ namespace TwinCatVariableViewer
         private ISymbolLoader _symbolLoader;
         private readonly List<ISymbol> _symbols = new List<ISymbol>();
         private bool _plcConnected;
-        private readonly DispatcherTimer _refreshDataTimer;
+        private readonly DispatcherTimer _refreshDataTimer = new DispatcherTimer(DispatcherPriority.Render);
 
         private ScrollViewer _scrollViewer;
 
@@ -34,17 +35,37 @@ namespace TwinCatVariableViewer
             set { _symbolListViewItems = value; }
         }
 
+        #region Check if DLL exists
+        [DllImport("kernel32", SetLastError = true)]
+        static extern IntPtr LoadLibrary(string lpFileName);
+
+        static bool CheckLibrary(string fileName)
+        {
+            return LoadLibrary(fileName) != IntPtr.Zero;
+        }
+        #endregion
+
         public MainWindow()
         {
             InitializeComponent();
 
-            ConnectPlc();
-            GetSymbols();
-            PopulateListView();
+            // check if twincat is installed
+            if (CheckLibrary("tcadsdll.dll"))
+            {
+                ConnectPlc();
+                if (_plcConnected)
+                    GetSymbols();
 
-            _refreshDataTimer = new DispatcherTimer(DispatcherPriority.Render);
-            _refreshDataTimer.Interval = TimeSpan.FromMilliseconds(500);
-            _refreshDataTimer.Tick += RefreshDataTimerOnTick;
+                PopulateListView();
+
+                _refreshDataTimer.Interval = TimeSpan.FromMilliseconds(500);
+                _refreshDataTimer.Tick += RefreshDataTimerOnTick;
+            }
+            else
+            {
+                TextBox1.Text = "Did not find tcadsdll.dll. Is TwinCat installed?!";
+                TextBox1.Foreground = new SolidColorBrush(Colors.OrangeRed);
+            }
         }
 
         private void ConnectPlc()
