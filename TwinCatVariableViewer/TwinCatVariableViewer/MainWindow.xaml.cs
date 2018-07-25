@@ -18,7 +18,11 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using TwinCAT;
 using TwinCAT.Ads;
+using TwinCAT.Ads.TypeSystem;
+using TwinCAT.Ads.ValueAccess;
+using TwinCAT.TypeSystem;
 
 namespace TwinCatVariableViewer
 {
@@ -27,9 +31,10 @@ namespace TwinCatVariableViewer
     /// </summary>
     public partial class MainWindow : Window
     {
+        private const bool DEBUG = false;
         private TcAdsClient _plcClient;
-        private TcAdsSymbolInfoLoader _symbolLoader;
-        private TcAdsSymbolInfoCollection _symbols;
+        private ISymbolLoader _symbolLoader;
+        private List<ISymbol> _symbols = new List<ISymbol>();
         private bool _plcConnected;
         private readonly DispatcherTimer _refreshDataTimer;
 
@@ -70,37 +75,7 @@ namespace TwinCatVariableViewer
             for (int i = 0; i < (int)_scrollViewer.ViewportHeight; i++)
             {
                 SymbolInfo symbol = SymbolListViewItems[(int)_scrollViewer.VerticalOffset+i];
-                string data = "";
-                if (symbol.Type == "BOOL")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(bool)).ToString();
-                if (symbol.Type == "BYTE")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(byte)).ToString();
-                if (symbol.Type == "SINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(sbyte)).ToString();
-                if (symbol.Type == "INT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(short)).ToString();
-                if (symbol.Type == "DINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(int)).ToString();
-                if (symbol.Type == "LINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(long)).ToString();
-                if (symbol.Type == "USINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(byte)).ToString();
-                if (symbol.Type == "UINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ushort)).ToString();
-                if (symbol.Type == "ULINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)).ToString();
-                if (symbol.Type == "UDINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ulong)).ToString();
-                if (symbol.Type == "REAL")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(float)).ToString();
-                if (symbol.Type == "LREAL")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(double)).ToString();
-                if (symbol.Type == "WORD")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ushort)).ToString();
-                if (symbol.Type == "DWORD")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)).ToString();
-
-                SymbolListViewItems[(int) _scrollViewer.VerticalOffset + i].CurrentValue = data;
+                SymbolListViewItems[(int) _scrollViewer.VerticalOffset + i].CurrentValue = GetSymbolValue(symbol);
             }
         }
 
@@ -108,54 +83,233 @@ namespace TwinCatVariableViewer
         {
             SymbolListViewItems?.Clear();
 
-            foreach (TcAdsSymbolInfo symbol in _symbols)
+            foreach (ISymbol symbol in _symbols)
             {
-                string data = "";
-                if (symbol.TypeName == "BOOL")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(bool)).ToString();
-                if (symbol.TypeName == "BYTE")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(byte)).ToString();
-                if (symbol.TypeName == "SINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(sbyte)).ToString();
-                if (symbol.TypeName == "INT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(short)).ToString();
-                if (symbol.TypeName == "DINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(int)).ToString();
-                if (symbol.TypeName == "LINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(long)).ToString();
-                if (symbol.TypeName == "USINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(byte)).ToString();
-                if (symbol.TypeName == "UINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ushort)).ToString();
-                if (symbol.TypeName == "ULINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)).ToString();
-                if (symbol.TypeName == "UDINT")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ulong)).ToString();
-                if (symbol.TypeName == "REAL")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(float)).ToString();
-                if (symbol.TypeName == "LREAL")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(double)).ToString();
-                if (symbol.TypeName == "WORD")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ushort)).ToString();
-                if (symbol.TypeName == "DWORD")
-                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)).ToString();
-
                 SymbolListViewItems?.Add(new SymbolInfo()
                 {
-                    Path = symbol.Name,
+                    Path = symbol.InstancePath,
                     Type = symbol.TypeName,
                     Size = symbol.Size,
-                    IndexGroup = symbol.IndexGroup,
-                    IndexOffset = symbol.IndexOffset,
+                    IndexGroup = ((IAdsSymbol)symbol).IndexGroup,
+                    IndexOffset = ((IAdsSymbol)symbol).IndexOffset,
                     IsStatic = symbol.IsStatic,
-                    CurrentValue = data
+                    CurrentValue = "pending..." // GetSymbolValue(symbol) // startup takes to long with loads of variables
                 });
             }
         }
 
+        private string GetSymbolValue(ISymbol symbol)
+        {
+            string data = "";
+            TimeSpan t;
+            DateTime dt;
+            switch (symbol.TypeName)
+            {
+                case "BOOL":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(bool)).ToString();
+                    break;
+                case "BYTE":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(byte)).ToString();
+                    break;
+                case "SINT":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(sbyte)).ToString();
+                    break;
+                case "INT":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(short)).ToString();
+                    break;
+                case "DINT":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(int)).ToString();
+                    break;
+                case "LINT":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(long)).ToString();
+                    break;
+                case "USINT":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(byte)).ToString();
+                    break;
+                case "UINT":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(ushort)).ToString();
+                    break;
+                case "ULINT":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(uint)).ToString();
+                    break;
+                case "UDINT":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(ulong)).ToString();
+                    break;
+                case "REAL":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(float)).ToString();
+                    break;
+                case "LREAL":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(double)).ToString();
+                    break;
+                case "WORD":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(ushort)).ToString();
+                    break;
+                case "DWORD":
+                    data = _plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(uint)).ToString();
+                    break;
+                case "TIME":
+                    t = TimeSpan.FromMilliseconds((uint)_plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(uint)));
+                    if (t.Minutes > 0) data = $"T#{t.Minutes}m{t.Seconds}s{t.Milliseconds}ms";
+                    else if (t.Seconds > 0) data = $"T#{t.Seconds}s{t.Milliseconds}ms";
+                    else data = $"T#{t.Milliseconds}ms";
+                    break;
+                case "TIME_OF_DAY":
+                case "TOD":
+                    t = TimeSpan.FromMilliseconds((uint)_plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(uint)));
+                    if (t.Hours > 0) data = $"TOD#{t.Hours}:{t.Minutes}:{t.Seconds}.{t.Milliseconds}";
+                    else if (t.Minutes > 0) data = $"TOD#{t.Minutes}:{t.Seconds}.{t.Milliseconds}";
+                    else data = $"TOD#{t.Seconds}.{t.Milliseconds}";
+                    break;
+                case "DATE":
+                    dt = new DateTime(1970, 1, 1);
+                    dt = dt.AddSeconds((uint)_plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(uint)));
+                    data = $"D#{dt.Year}-{dt.Month}-{dt.Day}";
+                    break;
+                case "DATE_AND_TIME":
+                case "DT":
+                    dt = new DateTime(1970, 1, 1);
+                    dt = dt.AddSeconds((uint)_plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(uint)));
+                    data = $"DT#{dt.Year}-{dt.Month}-{dt.Day}-{dt.Hour}:{dt.Minute}:{dt.Second}";
+                    break;
+            }
+
+            return data;
+        }
+
+        private string GetSymbolValue(SymbolInfo symbol)
+        {
+            string data = "";
+            TimeSpan t;
+            DateTime dt;
+            switch (symbol.Type)
+            {
+                case "BOOL":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(bool)).ToString();
+                    break;
+                case "BYTE":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(byte)).ToString();
+                    break;
+                case "SINT":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(sbyte)).ToString();
+                    break;
+                case "INT":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(short)).ToString();
+                    break;
+                case "DINT":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(int)).ToString();
+                    break;
+                case "LINT":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(long)).ToString();
+                    break;
+                case "USINT":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(byte)).ToString();
+                    break;
+                case "UINT":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ushort)).ToString();
+                    break;
+                case "ULINT":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)).ToString();
+                    break;
+                case "UDINT":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ulong)).ToString();
+                    break;
+                case "REAL":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(float)).ToString();
+                    break;
+                case "LREAL":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(double)).ToString();
+                    break;
+                case "WORD":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ushort)).ToString();
+                    break;
+                case "DWORD":
+                    data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)).ToString();
+                    break;
+                case "TIME":
+                    t = TimeSpan.FromMilliseconds((uint)_plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)));
+                    if (t.Minutes > 0) data = $"T#{t.Minutes}m{t.Seconds}s{t.Milliseconds}ms";
+                    else if (t.Seconds > 0) data = $"T#{t.Seconds}s{t.Milliseconds}ms";
+                    else data = $"T#{t.Milliseconds}ms";
+                    break;
+                case "TIME_OF_DAY":
+                case "TOD":
+                    t = TimeSpan.FromMilliseconds((uint)_plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)));
+                    if (t.Hours > 0) data = $"TOD#{t.Hours}:{t.Minutes}:{t.Seconds}.{t.Milliseconds}";
+                    else if (t.Minutes > 0) data = $"TOD#{t.Minutes}:{t.Seconds}.{t.Milliseconds}";
+                    else data = $"TOD#{t.Seconds}.{t.Milliseconds}";
+                    break;
+                case "DATE":
+                    dt = new DateTime(1970, 1, 1);
+                    dt = dt.AddSeconds((uint)_plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)));
+                    data = $"D#{dt.Year}-{dt.Month}-{dt.Day}";
+                    break;
+                case "DATE_AND_TIME":
+                case "DT":
+                    dt = new DateTime(1970, 1, 1);
+                    dt = dt.AddSeconds((uint)_plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)));
+                    data = $"DT#{dt.Year}-{dt.Month}-{dt.Day}-{dt.Hour}:{dt.Minute}:{dt.Second}";
+                    break;
+                default:
+                    if (symbol.Type.StartsWith("STRING"))
+                    {
+                        int charCount = Convert.ToInt32(symbol.Type.Replace("STRING(", "").Replace(")", ""));
+                        data = _plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(string), new[] { charCount }).ToString();
+                    }
+                    break;
+            }
+
+            return data;
+        }
+
         private void GetSymbols()
         {
-            _symbols = _symbolLoader.GetSymbols(false);
+            System.Diagnostics.Debug.WriteLine("Adding '{0}' Symbols:", _symbolLoader.Symbols.Count);
+            foreach (ISymbol symbol in _symbolLoader.Symbols)
+            {
+                AddSymbolRecursive(_symbols, symbol);
+            }
+        }
+        public void AddSymbolRecursive(List<ISymbol> symbols, ISymbol symbol)
+        {
+            IDataType type = symbol.DataType as IDataType;
+
+            foreach (ITypeAttribute attribute in symbol.Attributes)
+            {
+                if (DEBUG) Debug.WriteLine(string.Format("{{ {0} : {1} }}", attribute.Name, attribute.Value));
+            }
+
+            if (DEBUG) Debug.WriteLine(string.Format("{0} : {1} (IG: 0x{2} IO: 0x{3} size: {4})", symbol.InstancePath, symbol.TypeName, ((IAdsSymbol)symbol).IndexGroup.ToString("x"), ((IAdsSymbol)symbol).IndexOffset.ToString("x"), symbol.Size));
+
+            if (symbol.Category == DataTypeCategory.Array)
+            {
+                IArrayInstance arrInstance = (IArrayInstance)symbol;
+                IArrayType arrType = (IArrayType)symbol.DataType;
+
+                int count = 0;
+
+                foreach (ISymbol arrayElement in arrInstance.Elements)
+                {
+                    AddSymbolRecursive(symbols, arrayElement);
+                    count++;
+
+                    if (count > 20) // Write only the first 20 to limit output
+                        break;
+                }
+            }
+            else if (symbol.Category == DataTypeCategory.Struct)
+            {
+                IStructInstance structInstance = (IStructInstance)symbol;
+                IStructType structType = (IStructType)symbol.DataType;
+
+                foreach (ISymbol member in structInstance.MemberInstances)
+                {
+                    AddSymbolRecursive(symbols, member);
+                }
+            }
+            else
+            {
+                symbols.Add(symbol);
+            }
         }
 
         private void ConnectPlc()
@@ -164,12 +318,13 @@ namespace TwinCatVariableViewer
             {
                 _plcClient = new TcAdsClient();
                 _plcClient.Connect("127.0.0.1.1.1", 851);
-                _symbolLoader = _plcClient.CreateSymbolInfoLoader();
+                SymbolLoaderSettings settings = new SymbolLoaderSettings(SymbolsLoadMode.VirtualTree, ValueAccessMode.IndexGroupOffsetPreferred);
+                _symbolLoader = SymbolLoaderFactory.Create(_plcClient, settings);
                 _plcConnected = true;
             }
             catch (Exception e)
             {
-                Debug.WriteLine(e);
+                System.Diagnostics.Debug.WriteLine(e);
                 _plcConnected = false;
             }
         }
