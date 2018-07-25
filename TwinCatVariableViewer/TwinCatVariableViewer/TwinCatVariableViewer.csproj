@@ -50,6 +50,7 @@
     <Reference Include="TwinCAT.Ads, Version=4.2.164.0, Culture=neutral, PublicKeyToken=180016cd49e5e8c3, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\Dropbox\Dokumente\Code\C#\PB\TwinCatVariableViewer\DLLs\TwinCAT.Ads.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />

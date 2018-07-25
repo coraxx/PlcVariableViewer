@@ -7,12 +7,12 @@ using System.Windows;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("TwinCatVariableViewer")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("TwinCat Variable Viewer")]
+[assembly: AssemblyDescription("TwinCat 3 Variable Viewer")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("TwinCatVariableViewer")]
-[assembly: AssemblyCopyright("Copyright ©  2018")]
+[assembly: AssemblyProduct("TwinCat Variable Viewer")]
+[assembly: AssemblyCopyright("Copyright ©  2018 Jan Arnold")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
