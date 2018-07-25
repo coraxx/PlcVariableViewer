@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using TwinCAT;
@@ -90,23 +91,36 @@ namespace TwinCatVariableViewer
             }
         }
 
-        private void PopulateListView()
+        private void PopulateListView(string filterName = null)
         {
             SymbolListViewItems?.Clear();
 
             foreach (ISymbol symbol in _symbols)
             {
-                SymbolListViewItems?.Add(new SymbolInfo()
+                if (filterName == null || symbol.InstancePath.ToLower().Contains(filterName.ToLower()))
                 {
-                    Path = symbol.InstancePath,
-                    Type = symbol.TypeName,
-                    Size = symbol.Size,
-                    IndexGroup = ((IAdsSymbol)symbol).IndexGroup,
-                    IndexOffset = ((IAdsSymbol)symbol).IndexOffset,
-                    IsStatic = symbol.IsStatic,
-                    CurrentValue = "pending..." // GetSymbolValue(symbol) // startup takes to long with loads of variables
-                });
+                    SymbolListViewItems?.Add(new SymbolInfo()
+                    {
+                        Path = symbol.InstancePath,
+                        Type = symbol.TypeName,
+                        Size = symbol.Size,
+                        IndexGroup = ((IAdsSymbol)symbol).IndexGroup,
+                        IndexOffset = ((IAdsSymbol)symbol).IndexOffset,
+                        IsStatic = symbol.IsStatic,
+                        CurrentValue = "pending..." // GetSymbolValue(symbol) // startup takes to long with loads of variables
+                    });
+                }
             }
+        }
+
+        private void TextBox1_OnKeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter ) PopulateListView(TextBox1.Text);
+        }
+
+        private void ButtonBase_OnClick(object sender, RoutedEventArgs e)
+        {
+            PopulateListView(TextBox1.Text);
         }
     }
 
