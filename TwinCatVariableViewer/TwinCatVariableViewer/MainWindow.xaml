@@ -1,0 +1,115 @@
+﻿<Window x:Class="TwinCatVariableViewer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TwinCatVariableViewer"
+        mc:Ignorable="d"
+        DataContext="{Binding RelativeSource={RelativeSource Self}}"
+        Title="MainWindow" Height="450" Width="1200"
+        Loaded="MainWindow_OnLoaded">
+	
+	<Window.Resources>
+		<local:BoolToValueConverter x:Key="BoolToValueConverter"/>
+		<Color x:Key="AccentColor">#FF0093FF</Color>
+		<Color x:Key="BackgroundColor">#FF343434</Color>
+		<Color x:Key="ForegroundColor">#FFEEEEEE</Color>
+		<Color x:Key="BackgroundLightColor">#FF888888</Color>
+		<SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}" />
+		<SolidColorBrush x:Key="ForegroundBrush" Color="{StaticResource ForegroundColor}" />
+		<SolidColorBrush x:Key="BackgroundLightBrush" Color="{StaticResource BackgroundLightColor}" />
+		<SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+
+		<Style x:Key="ListViewItemStyle" TargetType="{x:Type ListViewItem}">
+			<Setter Property="HorizontalContentAlignment" Value="Left"/>
+			<Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+			<Style.Triggers>
+				<!-- Color of the item depending on percentage value. -->
+				<!--<DataTrigger Binding="{Binding InUse, Converter={StaticResource BoolToValueConverter}}" Value="1" >
+					<Setter Property="Background" Value="GreenYellow" />
+				</DataTrigger>
+
+				<DataTrigger Binding="{Binding InUse, Converter={StaticResource BoolToValueConverter}}" Value="0" >
+					<Setter Property="Background" Value="LightGray" />
+				</DataTrigger>-->
+
+				<!-- Style for the selecting item -->
+				<Trigger Property="IsSelected" Value="true">
+					<Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+					<Setter Property="Foreground" Value="White"/>
+				</Trigger>
+				<!-- Style for the item when the mouse is over -->
+				<Trigger Property="IsMouseOver" Value="True">
+					<Setter Property="Background" Value="{StaticResource AccentBrush}" />
+					<Setter Property="BorderBrush" Value="White" />
+				</Trigger>
+			</Style.Triggers>
+		</Style>
+	</Window.Resources>
+
+	<Grid>
+		<ListView x:Name="SymbolListView" SelectionMode="Single" Style="{x:Null}" Margin="10" Background="{StaticResource BackgroundLightBrush}"
+		          ItemContainerStyle="{StaticResource ListViewItemStyle}" ItemsSource="{Binding SymbolListViewItems}">
+			<ListView.View>
+				<GridView>
+
+					<GridViewColumn Header="Path" Width="400">
+						<GridViewColumn.CellTemplate>
+							<DataTemplate>
+								<TextBlock Grid.Row="0" Text="{Binding Path, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+							</DataTemplate>
+						</GridViewColumn.CellTemplate>
+					</GridViewColumn>
+
+					<GridViewColumn Header="Type" Width="200">
+						<GridViewColumn.CellTemplate>
+							<DataTemplate>
+								<TextBlock Grid.Row="0" Text="{Binding Type, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+							</DataTemplate>
+						</GridViewColumn.CellTemplate>
+					</GridViewColumn>
+
+					<GridViewColumn Header="Size" Width="100">
+						<GridViewColumn.CellTemplate>
+							<DataTemplate>
+								<TextBlock Grid.Row="0" Text="{Binding Size, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+							</DataTemplate>
+						</GridViewColumn.CellTemplate>
+					</GridViewColumn>
+
+					<GridViewColumn Header="Index Group" Width="100">
+						<GridViewColumn.CellTemplate>
+							<DataTemplate>
+								<TextBlock Grid.Row="0" Text="{Binding IndexGroup, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+							</DataTemplate>
+						</GridViewColumn.CellTemplate>
+					</GridViewColumn>
+
+					<GridViewColumn Header="Index Offset" Width="100">
+						<GridViewColumn.CellTemplate>
+							<DataTemplate>
+								<TextBlock Grid.Row="0" Text="{Binding IndexOffset, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+							</DataTemplate>
+						</GridViewColumn.CellTemplate>
+					</GridViewColumn>
+
+					<GridViewColumn Header="Is Static" Width="100">
+						<GridViewColumn.CellTemplate>
+							<DataTemplate>
+								<TextBlock Grid.Row="0" Text="{Binding IsStatic, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+							</DataTemplate>
+						</GridViewColumn.CellTemplate>
+					</GridViewColumn>
+
+					<GridViewColumn Header="Current Value" Width="100">
+						<GridViewColumn.CellTemplate>
+							<DataTemplate>
+								<TextBlock Grid.Row="0" Text="{Binding CurrentValue, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+							</DataTemplate>
+						</GridViewColumn.CellTemplate>
+					</GridViewColumn>
+				</GridView>
+			</ListView.View>
+		</ListView>
+	</Grid>
+</Window>
