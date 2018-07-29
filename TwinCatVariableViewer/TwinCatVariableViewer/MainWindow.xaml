@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:TwinCatVariableViewer"
         mc:Ignorable="d"
         DataContext="{Binding RelativeSource={RelativeSource Self}}"
-        Title="TwinCat Variable Viewer" Height="650" Width="1200"
+        Title="TwinCat Variable Viewer" Height="650" Width="1080"
         Loaded="MainWindow_OnLoaded">
 	
 	<Window.Resources>
@@ -55,7 +55,8 @@
 		<Grid.RowDefinitions>
 			<RowDefinition Height="35"/>
 			<RowDefinition Height="*"/>
-			<RowDefinition Height="50"/>
+			<RowDefinition Height="40"/>
+			<RowDefinition Height="10"/>
 		</Grid.RowDefinitions>
 		<Grid Grid.Row="0" >
 			<Grid.ColumnDefinitions>
@@ -70,13 +71,10 @@
 			<ListView.View>
 				<GridView>
 
-					<GridViewColumn
-						Header="Number"
-						DisplayMemberBinding="{Binding RelativeSource={RelativeSource FindAncestor, 
-                                         AncestorType={x:Type ListViewItem}}, 
-                                         Converter={StaticResource IndexConverter}}" />
+					<GridViewColumn Header="" Width="50"
+					                DisplayMemberBinding="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type ListViewItem}}, Converter={StaticResource IndexConverter}}" />
 
-					<GridViewColumn Header="Path" Width="400">
+					<GridViewColumn Header="Path" Width="450">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
 								<TextBlock Text="{Binding Path, Mode=TwoWay}" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="12" Margin="0"/>
@@ -116,15 +114,15 @@
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
 
-					<GridViewColumn Header="Is Static" Width="50">
+					<!--<GridViewColumn Header="Is Static" Width="50">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
 								<TextBlock Text="{Binding IsStatic, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
-					</GridViewColumn>
+					</GridViewColumn>-->
 
-					<GridViewColumn Header="Current Value" Width="350">
+					<GridViewColumn Header="Current Value" Width="150">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
 								<TextBlock Text="{Binding CurrentValue, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>

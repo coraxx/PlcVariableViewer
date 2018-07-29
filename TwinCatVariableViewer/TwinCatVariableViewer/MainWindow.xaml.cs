@@ -72,8 +72,8 @@ namespace TwinCatVariableViewer
             }
             else
             {
-                TextBox1.Text = "Did not find tcadsdll.dll. Is TwinCat installed?!";
-                TextBox1.Foreground = new SolidColorBrush(Colors.OrangeRed);
+                DumpData.IsEnabled = false;
+                UpdateDumpStatus("Did not find tcadsdll.dll. Is TwinCat/ADS installed?!", Colors.Red);
             }
         }
 
@@ -88,6 +88,72 @@ namespace TwinCatVariableViewer
 
                 StateInfo stateInfo = _plcClient.ReadState();
                 AdsState state = stateInfo.AdsState;
+                switch (state)
+                {
+                    case AdsState.Invalid:
+                        UpdateDumpStatus("PLC state: Invalid", Colors.Red);
+                        break;
+                    case AdsState.Idle:
+                        UpdateDumpStatus("PLC state: Idle", Colors.Orange);
+                        break;
+                    case AdsState.Reset:
+                        UpdateDumpStatus("PLC state: Reset", Colors.Orange);
+                        break;
+                    case AdsState.Init:
+                        UpdateDumpStatus("PLC state: Init", Colors.Orange);
+                        break;
+                    case AdsState.Start:
+                        UpdateDumpStatus("PLC state: Start", Colors.Yellow);
+                        break;
+                    case AdsState.Run:
+                        UpdateDumpStatus("PLC state: Run", Colors.GreenYellow);
+                        break;
+                    case AdsState.Stop:
+                        UpdateDumpStatus("PLC state: Stop", Colors.Orange);
+                        break;
+                    case AdsState.SaveConfig:
+                        UpdateDumpStatus("PLC state: SaveConfig", Colors.Orange);
+                        break;
+                    case AdsState.LoadConfig:
+                        UpdateDumpStatus("PLC state: LoadConfig", Colors.Orange);
+                        break;
+                    case AdsState.PowerFailure:
+                        UpdateDumpStatus("PLC state: PowerFailure", Colors.Orange);
+                        break;
+                    case AdsState.PowerGood:
+                        UpdateDumpStatus("PLC state: PowerGood", Colors.Orange);
+                        break;
+                    case AdsState.Error:
+                        UpdateDumpStatus("PLC state: Error", Colors.Orange);
+                        break;
+                    case AdsState.Shutdown:
+                        UpdateDumpStatus("PLC state: Shutdown", Colors.Orange);
+                        break;
+                    case AdsState.Suspend:
+                        UpdateDumpStatus("PLC state: Suspend", Colors.Orange);
+                        break;
+                    case AdsState.Resume:
+                        UpdateDumpStatus("PLC state: Resume", Colors.Orange);
+                        break;
+                    case AdsState.Config:
+                        UpdateDumpStatus("PLC state: Config", Colors.Orange);
+                        break;
+                    case AdsState.Reconfig:
+                        UpdateDumpStatus("PLC state: Reconfig", Colors.Orange);
+                        break;
+                    case AdsState.Stopping:
+                        UpdateDumpStatus("PLC state: Stopping", Colors.Orange);
+                        break;
+                    case AdsState.Incompatible:
+                        UpdateDumpStatus("PLC state: Incompatible", Colors.Red);
+                        break;
+                    case AdsState.Exception:
+                        UpdateDumpStatus("PLC state: Exception", Colors.Red);
+                        break;
+                    default:
+                        Debug.WriteLine(state);
+                        break;
+                }
                 _plcConnected = (state == AdsState.Run);
             }
             catch (Exception e)
@@ -95,6 +161,7 @@ namespace TwinCatVariableViewer
                 Debug.WriteLine(e);
                 _plcConnected = false;
             }
+            DumpData.IsEnabled = _plcConnected;
         }
 
         private void GetSymbols()
@@ -117,13 +184,13 @@ namespace TwinCatVariableViewer
 
         private void RefreshDataTimerOnTick(object sender, EventArgs eventArgs)
         {
-            Stopwatch sw = Stopwatch.StartNew();
+            //Stopwatch sw = Stopwatch.StartNew();
             for (int i = 0; i < (int)_scrollViewer.ViewportHeight; i++)
             {
                 SymbolInfo symbol = SymbolListViewItems[(int)_scrollViewer.VerticalOffset+i];
                 SymbolListViewItems[(int) _scrollViewer.VerticalOffset + i].CurrentValue = Tc3Symbols.GetSymbolValue(symbol, _plcClient);
             }
-            Debug.WriteLine($"Collecting data from PLC for ListView: {sw.Elapsed}");
+            //Debug.WriteLine($"Collecting data from PLC for ListView: {sw.Elapsed}");
         }
 
         private void PopulateListView(string filterName = null)
@@ -160,26 +227,25 @@ namespace TwinCatVariableViewer
 
         private async Task ReadAll()
         {
-            Stopwatch sw = Stopwatch.StartNew();
+            //Stopwatch sw = Stopwatch.StartNew();
             SymbolCollection symbolColl = new SymbolCollection();
             
             foreach (var symbol in _symbols)
             {
                 symbolColl.Add(symbol);
             }
-
-            // Sum Command Read
+            
             SumSymbolRead sumSymbolRead = new SumSymbolRead(_plcClient, symbolColl);
             await Task.Run(() =>
             {
                 _symbolValues = sumSymbolRead.Read();
             });
-            Debug.WriteLine($"Collecting data from PLC: {sw.Elapsed}");
+            //Debug.WriteLine($"Collecting data from PLC: {sw.Elapsed}");
         }
 
         private async void DumpData_OnClick(object sender, RoutedEventArgs e)
         {
-            Stopwatch sw = Stopwatch.StartNew();
+            //Stopwatch sw = Stopwatch.StartNew();
             UpdateDumpStatus("Dumping data...", Colors.AliceBlue);
             if (!_plcConnected)
             {
@@ -251,7 +317,7 @@ namespace TwinCatVariableViewer
 
             UpdateDumpStatus("Done", Colors.GreenYellow);
             DumpSpinner(false);
-            Debug.WriteLine($"Dumping data from PLC to file: {sw.Elapsed}");
+            //Debug.WriteLine($"Dumping data from PLC to file: {sw.Elapsed}");
         }
 
         private void DumpSpinner(bool show)
