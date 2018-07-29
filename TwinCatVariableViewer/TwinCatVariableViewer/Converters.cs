@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Globalization;
+using System.Windows.Controls;
 using System.Windows.Data;
 
 namespace TwinCatVariableViewer
@@ -8,18 +10,45 @@ namespace TwinCatVariableViewer
     public class BoolToValueConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter,
-            System.Globalization.CultureInfo culture)
+            CultureInfo culture)
         {
-            var _bool = (bool)System.Convert.ChangeType(value, typeof(bool));
+            bool _bool;
+            try
+            {
 
-            if (_bool)
-                return 1;
+                _bool = (bool)System.Convert.ChangeType(value, typeof(bool));
+            }
+            catch (Exception)
+            {
+                _bool = false;
+            }
 
-            return 0;
+            return _bool ? 1 : 0;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter,
-            System.Globalization.CultureInfo culture)
+            CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    [ValueConversion(typeof(object), typeof(string))]
+    public class IndexConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            ListViewItem item = (ListViewItem)value;
+            if (item != null && ItemsControl.ItemsControlFromItemContainer(item) is ListView listView)
+            {
+                int index = listView.ItemContainerGenerator.IndexFromContainer(item);
+                return index.ToString();
+            }
+
+            return "";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }

@@ -11,6 +11,7 @@
 	
 	<Window.Resources>
 		<local:BoolToValueConverter x:Key="BoolToValueConverter"/>
+		<local:IndexConverter x:Key="IndexConverter"/>
 		<Color x:Key="AccentColor">#0574C5</Color>
 		<Color x:Key="BackgroundColor">#FF343434</Color>
 		<Color x:Key="ForegroundColor">#FFEEEEEE</Color>
@@ -25,11 +26,11 @@
 			<Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
 			<Style.Triggers>
 				<!-- Color of the item depending on percentage value. -->
-				<!--<DataTrigger Binding="{Binding InUse, Converter={StaticResource BoolToValueConverter}}" Value="1" >
+				<!--<DataTrigger Binding="{Binding CurrentValue, Converter={StaticResource BoolToValueConverter}}" Value="1" >
 					<Setter Property="Background" Value="GreenYellow" />
 				</DataTrigger>
 
-				<DataTrigger Binding="{Binding InUse, Converter={StaticResource BoolToValueConverter}}" Value="0" >
+				<DataTrigger Binding="{Binding CurrentValue, Converter={StaticResource BoolToValueConverter}}" Value="0" >
 					<Setter Property="Background" Value="LightGray" />
 				</DataTrigger>-->
 
@@ -45,12 +46,16 @@
 				</Trigger>
 			</Style.Triggers>
 		</Style>
+		<Storyboard x:Key="SpinnerAnimation">
+			<DoubleAnimation Storyboard.TargetName="SpinnerRotateTransform" Storyboard.TargetProperty="Angle" From="0" To="360" Duration="00:00:01" RepeatBehavior="Forever"/>
+		</Storyboard>
 	</Window.Resources>
 
-	<Grid Background="{StaticResource BackgroundBrush}">
+	<Grid x:Name="RootGrid" Background="{StaticResource BackgroundBrush}">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="35"/>
 			<RowDefinition Height="*"/>
+			<RowDefinition Height="50"/>
 		</Grid.RowDefinitions>
 		<Grid Grid.Row="0" >
 			<Grid.ColumnDefinitions>
@@ -65,10 +70,16 @@
 			<ListView.View>
 				<GridView>
 
+					<GridViewColumn
+						Header="Number"
+						DisplayMemberBinding="{Binding RelativeSource={RelativeSource FindAncestor, 
+                                         AncestorType={x:Type ListViewItem}}, 
+                                         Converter={StaticResource IndexConverter}}" />
+
 					<GridViewColumn Header="Path" Width="400">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBlock Grid.Row="0" Text="{Binding Path, Mode=TwoWay}" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+								<TextBlock Text="{Binding Path, Mode=TwoWay}" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="12" Margin="0"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
@@ -76,7 +87,7 @@
 					<GridViewColumn Header="Type" Width="100">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBlock Grid.Row="0" Text="{Binding Type, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+								<TextBlock Text="{Binding Type, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
@@ -84,7 +95,7 @@
 					<GridViewColumn Header="Size" Width="50">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBlock Grid.Row="0" Text="{Binding Size, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+								<TextBlock Text="{Binding Size, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
@@ -92,7 +103,7 @@
 					<GridViewColumn Header="Index Group" Width="100">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBlock Grid.Row="0" Text="{Binding IndexGroup, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+								<TextBlock Text="{Binding IndexGroup, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
@@ -100,7 +111,7 @@
 					<GridViewColumn Header="Index Offset" Width="100">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBlock Grid.Row="0" Text="{Binding IndexOffset, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+								<TextBlock Text="{Binding IndexOffset, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
@@ -108,7 +119,7 @@
 					<GridViewColumn Header="Is Static" Width="50">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBlock Grid.Row="0" Text="{Binding IsStatic, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+								<TextBlock Text="{Binding IsStatic, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
@@ -116,12 +127,42 @@
 					<GridViewColumn Header="Current Value" Width="350">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBlock Grid.Row="0" Text="{Binding CurrentValue, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+								<TextBlock Text="{Binding CurrentValue, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>
 				</GridView>
 			</ListView.View>
 		</ListView>
+
+		<Grid Grid.Row="2" HorizontalAlignment="Right" Width="{Binding ActualWidth, ElementName=RootGrid}">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto"/>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="45"/>
+				<ColumnDefinition Width="10"/>
+				<ColumnDefinition Width="120"/>
+			</Grid.ColumnDefinitions>
+			<TextBlock x:Name="TextBlockDumpStatus" Grid.Column="0" Foreground="AliceBlue" FontSize="16" Height="25" Margin="10,0,0,0"/>
+			<Ellipse x:Name="Spinner" Grid.Column="2" StrokeThickness="1" RenderTransformOrigin="0.5,0.5" Height="40" Width="40" Visibility="Hidden">
+				<Ellipse.Stroke>
+					<RadialGradientBrush
+						GradientOrigin="0.5,0.5"
+						Center="0,0">
+						<RadialGradientBrush.GradientStops>
+							<GradientStop Color="White" Offset="0" />
+							<GradientStop Color="{StaticResource AccentColor}" Offset="0.7" />
+						</RadialGradientBrush.GradientStops>
+					</RadialGradientBrush>
+				</Ellipse.Stroke>
+				<Ellipse.RenderTransform>
+					<TransformGroup>
+						<RotateTransform x:Name="SpinnerRotateTransform" />
+					</TransformGroup>
+				</Ellipse.RenderTransform>
+			</Ellipse>
+			<Button x:Name="DumpData" Grid.Column="4" Content="Dump all to file" Height="40" Click="DumpData_OnClick" Margin="0,0,10,0"/>
+		</Grid>
 	</Grid>
 </Window>
+

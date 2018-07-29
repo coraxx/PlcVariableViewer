@@ -48,7 +48,8 @@ namespace TwinCatVariableViewer
             }
             else
             {
-                symbols.Add(symbol);
+                // "REFERENCE TO ..." cannot be read, so filter it out. Comes from InOut variables in function blocks
+                if (!symbol.TypeName.Contains("REFERENCE")) symbols.Add(symbol);
             }
         }
 
@@ -83,10 +84,10 @@ namespace TwinCatVariableViewer
                 case "UINT":
                     data = plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(ushort)).ToString();
                     break;
-                case "ULINT":
+                case "UDINT":
                     data = plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(uint)).ToString();
                     break;
-                case "UDINT":
+                case "ULINT":
                     data = plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(ulong)).ToString();
                     break;
                 case "REAL":
@@ -161,10 +162,10 @@ namespace TwinCatVariableViewer
                 case "UINT":
                     data = plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ushort)).ToString();
                     break;
-                case "ULINT":
+                case "UDINT":
                     data = plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(uint)).ToString();
                     break;
-                case "UDINT":
+                case "ULINT":
                     data = plcClient.ReadAny(symbol.IndexGroup, symbol.IndexOffset, typeof(ulong)).ToString();
                     break;
                 case "REAL":
