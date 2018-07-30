@@ -39,8 +39,10 @@ namespace TwinCatVariableViewer
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             ListViewItem item = (ListViewItem)value;
-            if (item != null && ItemsControl.ItemsControlFromItemContainer(item) is ListView listView)
+            if (item != null)
             {
+                ListView listView = ItemsControl.ItemsControlFromItemContainer(item) as ListView;
+                if (listView == null) return "";
                 int index = listView.ItemContainerGenerator.IndexFromContainer(item);
                 return index.ToString();
             }

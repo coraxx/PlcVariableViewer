@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -30,7 +31,6 @@ namespace TwinCatVariableViewer
         private ISymbolLoader _symbolLoader;
         private readonly List<ISymbol> _symbols = new List<ISymbol>();
         private object[] _symbolValues;
-        private bool _plcConnected;
         private readonly DispatcherTimer _refreshDataTimer = new DispatcherTimer(DispatcherPriority.Render);
 
         private ScrollViewer _scrollViewer;
@@ -38,8 +38,31 @@ namespace TwinCatVariableViewer
         private ObservableCollection<SymbolInfo> _symbolListViewItems = new ObservableCollection<SymbolInfo>();
         public ObservableCollection<SymbolInfo> SymbolListViewItems
         {
-            get => _symbolListViewItems ?? (_symbolListViewItems = new ObservableCollection<SymbolInfo>());
-            set => _symbolListViewItems = value;
+            get { return _symbolListViewItems ?? (_symbolListViewItems = new ObservableCollection<SymbolInfo>()); }
+            set { _symbolListViewItems = value; }
+        }
+
+        private bool _plcConnected;
+        public bool PlcConnected
+        {
+            get { return _plcConnected; }
+            set
+            {
+                if (_plcConnected != value)
+                {
+                    if (value)
+                    {
+                        _plcClient.AdsStateChanged += _plcClient_AdsStateChanged;
+                        _refreshDataTimer.Tick += RefreshDataTimerOnTick;
+                    }
+                    else
+                    {
+                        _plcClient.AdsStateChanged -= _plcClient_AdsStateChanged;
+                        _refreshDataTimer.Tick -= RefreshDataTimerOnTick;
+                    }
+                }
+                _plcConnected = value;
+            }
         }
 
         #region Check if DLL exists
@@ -56,19 +79,12 @@ namespace TwinCatVariableViewer
         {
             InitializeComponent();
 
+            _refreshDataTimer.Interval = TimeSpan.FromMilliseconds(200);
+
             // check if twincat is installed
             if (CheckLibrary("tcadsdll.dll"))
             {
                 ConnectPlc();
-                if (_plcConnected)
-                {
-                    GetSymbols();
-                }
-
-                PopulateListView();
-
-                _refreshDataTimer.Interval = TimeSpan.FromMilliseconds(200);
-                _refreshDataTimer.Tick += RefreshDataTimerOnTick;
             }
             else
             {
@@ -79,8 +95,15 @@ namespace TwinCatVariableViewer
 
         private void ConnectPlc()
         {
+            if (_plcClient != null && _plcClient.ConnectionState == ConnectionState.Connected)
+            {
+                PlcConnected = false;
+                _plcClient.Disconnect();
+            }
+
             try
             {
+                _plcClient?.Dispose();
                 _plcClient = new TcAdsClient();
                 _plcClient.Connect("127.0.0.1.1.1", 851);
                 SymbolLoaderSettings settings = new SymbolLoaderSettings(SymbolsLoadMode.VirtualTree, ValueAccessMode.IndexGroupOffsetPreferred);
@@ -88,84 +111,105 @@ namespace TwinCatVariableViewer
 
                 StateInfo stateInfo = _plcClient.ReadState();
                 AdsState state = stateInfo.AdsState;
-                switch (state)
+                DisplayPlcState(state);
+                PlcConnected = (state == AdsState.Run || state == AdsState.Stop);
+                if (PlcConnected)
                 {
-                    case AdsState.Invalid:
-                        UpdateDumpStatus("PLC state: Invalid", Colors.Red);
-                        break;
-                    case AdsState.Idle:
-                        UpdateDumpStatus("PLC state: Idle", Colors.Orange);
-                        break;
-                    case AdsState.Reset:
-                        UpdateDumpStatus("PLC state: Reset", Colors.Orange);
-                        break;
-                    case AdsState.Init:
-                        UpdateDumpStatus("PLC state: Init", Colors.Orange);
-                        break;
-                    case AdsState.Start:
-                        UpdateDumpStatus("PLC state: Start", Colors.Yellow);
-                        break;
-                    case AdsState.Run:
-                        UpdateDumpStatus("PLC state: Run", Colors.GreenYellow);
-                        break;
-                    case AdsState.Stop:
-                        UpdateDumpStatus("PLC state: Stop", Colors.Orange);
-                        break;
-                    case AdsState.SaveConfig:
-                        UpdateDumpStatus("PLC state: SaveConfig", Colors.Orange);
-                        break;
-                    case AdsState.LoadConfig:
-                        UpdateDumpStatus("PLC state: LoadConfig", Colors.Orange);
-                        break;
-                    case AdsState.PowerFailure:
-                        UpdateDumpStatus("PLC state: PowerFailure", Colors.Orange);
-                        break;
-                    case AdsState.PowerGood:
-                        UpdateDumpStatus("PLC state: PowerGood", Colors.Orange);
-                        break;
-                    case AdsState.Error:
-                        UpdateDumpStatus("PLC state: Error", Colors.Orange);
-                        break;
-                    case AdsState.Shutdown:
-                        UpdateDumpStatus("PLC state: Shutdown", Colors.Orange);
-                        break;
-                    case AdsState.Suspend:
-                        UpdateDumpStatus("PLC state: Suspend", Colors.Orange);
-                        break;
-                    case AdsState.Resume:
-                        UpdateDumpStatus("PLC state: Resume", Colors.Orange);
-                        break;
-                    case AdsState.Config:
-                        UpdateDumpStatus("PLC state: Config", Colors.Orange);
-                        break;
-                    case AdsState.Reconfig:
-                        UpdateDumpStatus("PLC state: Reconfig", Colors.Orange);
-                        break;
-                    case AdsState.Stopping:
-                        UpdateDumpStatus("PLC state: Stopping", Colors.Orange);
-                        break;
-                    case AdsState.Incompatible:
-                        UpdateDumpStatus("PLC state: Incompatible", Colors.Red);
-                        break;
-                    case AdsState.Exception:
-                        UpdateDumpStatus("PLC state: Exception", Colors.Red);
-                        break;
-                    default:
-                        Debug.WriteLine(state);
-                        break;
+                    GetSymbols();
+                    PopulateListView();
                 }
-                _plcConnected = (state == AdsState.Run);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                Debug.WriteLine(e);
-                _plcConnected = false;
+                Debug.WriteLine(ex.Message);
+                UpdateDumpStatus($"PLC state: {ex.Message}", Colors.Red);
+                PlcConnected = false;
             }
-            DumpData.IsEnabled = _plcConnected;
+            //DumpData.IsEnabled = _plcConnected;
+        }
+
+        private void DisplayPlcState(AdsState state)
+        {
+            switch (state)
+            {
+                case AdsState.Invalid:
+                    UpdateDumpStatus("PLC state: Invalid", Colors.Red);
+                    break;
+                case AdsState.Idle:
+                    UpdateDumpStatus("PLC state: Idle", Colors.Orange);
+                    break;
+                case AdsState.Reset:
+                    UpdateDumpStatus("PLC state: Reset", Colors.Orange);
+                    break;
+                case AdsState.Init:
+                    UpdateDumpStatus("PLC state: Init", Colors.Orange);
+                    break;
+                case AdsState.Start:
+                    UpdateDumpStatus("PLC state: Start", Colors.Yellow);
+                    break;
+                case AdsState.Run:
+                    UpdateDumpStatus("PLC state: Run", Colors.GreenYellow);
+                    break;
+                case AdsState.Stop:
+                    UpdateDumpStatus("PLC state: Stop", Colors.Orange);
+                    break;
+                case AdsState.SaveConfig:
+                    UpdateDumpStatus("PLC state: SaveConfig", Colors.Orange);
+                    break;
+                case AdsState.LoadConfig:
+                    UpdateDumpStatus("PLC state: LoadConfig", Colors.Orange);
+                    break;
+                case AdsState.PowerFailure:
+                    UpdateDumpStatus("PLC state: PowerFailure", Colors.Orange);
+                    break;
+                case AdsState.PowerGood:
+                    UpdateDumpStatus("PLC state: PowerGood", Colors.Orange);
+                    break;
+                case AdsState.Error:
+                    UpdateDumpStatus("PLC state: Error", Colors.Orange);
+                    break;
+                case AdsState.Shutdown:
+                    UpdateDumpStatus("PLC state: Shutdown", Colors.Orange);
+                    break;
+                case AdsState.Suspend:
+                    UpdateDumpStatus("PLC state: Suspend", Colors.Orange);
+                    break;
+                case AdsState.Resume:
+                    UpdateDumpStatus("PLC state: Resume", Colors.Orange);
+                    break;
+                case AdsState.Config:
+                    UpdateDumpStatus("PLC state: Config", Colors.Orange);
+                    break;
+                case AdsState.Reconfig:
+                    UpdateDumpStatus("PLC state: Reconfig", Colors.Orange);
+                    break;
+                case AdsState.Stopping:
+                    UpdateDumpStatus("PLC state: Stopping", Colors.Orange);
+                    break;
+                case AdsState.Incompatible:
+                    UpdateDumpStatus("PLC state: Incompatible", Colors.Red);
+                    break;
+                case AdsState.Exception:
+                    UpdateDumpStatus("PLC state: Exception", Colors.Red);
+                    break;
+                default:
+                    Debug.WriteLine(state);
+                    break;
+            }
+        }
+
+        private void _plcClient_AdsStateChanged(object sender, AdsStateChangedEventArgs e)
+        {
+            StateInfo stateInfo = _plcClient.ReadState();
+            AdsState state = stateInfo.AdsState;
+            DisplayPlcState(state);
+
+            PlcConnected = state == AdsState.Run;
         }
 
         private void GetSymbols()
         {
+            _symbols.Clear();
             foreach (ISymbol symbol in _symbolLoader.Symbols)
             {
                 Tc3Symbols.AddSymbolRecursive(_symbols, symbol);
@@ -175,20 +219,19 @@ namespace TwinCatVariableViewer
         private void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
         {
             // Get scrollviewer
-            if (VisualTreeHelper.GetChild(SymbolListView, 0) is Decorator border) _scrollViewer = border.Child as ScrollViewer;
-            if (_scrollViewer != null)
-            {
-                _refreshDataTimer.IsEnabled = _plcConnected;
-            }
+            Decorator border = VisualTreeHelper.GetChild(SymbolListView, 0) as Decorator;
+            if (border != null) _scrollViewer = border.Child as ScrollViewer;
+            _refreshDataTimer.IsEnabled = PlcConnected;
         }
 
         private void RefreshDataTimerOnTick(object sender, EventArgs eventArgs)
         {
             //Stopwatch sw = Stopwatch.StartNew();
+            if (_scrollViewer == null) return;
             for (int i = 0; i < (int)_scrollViewer.ViewportHeight; i++)
             {
-                SymbolInfo symbol = SymbolListViewItems[(int)_scrollViewer.VerticalOffset+i];
-                SymbolListViewItems[(int) _scrollViewer.VerticalOffset + i].CurrentValue = Tc3Symbols.GetSymbolValue(symbol, _plcClient);
+                SymbolInfo symbol = SymbolListViewItems[(int)_scrollViewer.VerticalOffset + i];
+                SymbolListViewItems[(int)_scrollViewer.VerticalOffset + i].CurrentValue = Tc3Symbols.GetSymbolValue(symbol, _plcClient);
             }
             //Debug.WriteLine($"Collecting data from PLC for ListView: {sw.Elapsed}");
         }
@@ -217,7 +260,7 @@ namespace TwinCatVariableViewer
 
         private void TextBox1_OnKeyUp(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter ) PopulateListView(TextBox1.Text);
+            if (e.Key == Key.Enter) PopulateListView(TextBox1.Text);
         }
 
         private void ButtonBase_OnClick(object sender, RoutedEventArgs e)
@@ -229,12 +272,12 @@ namespace TwinCatVariableViewer
         {
             //Stopwatch sw = Stopwatch.StartNew();
             SymbolCollection symbolColl = new SymbolCollection();
-            
+
             foreach (var symbol in _symbols)
             {
                 symbolColl.Add(symbol);
             }
-            
+
             SumSymbolRead sumSymbolRead = new SumSymbolRead(_plcClient, symbolColl);
             await Task.Run(() =>
             {
@@ -247,7 +290,7 @@ namespace TwinCatVariableViewer
         {
             //Stopwatch sw = Stopwatch.StartNew();
             UpdateDumpStatus("Dumping data...", Colors.AliceBlue);
-            if (!_plcConnected)
+            if (!PlcConnected)
             {
                 UpdateDumpStatus("PLC not running", Colors.Orange);
                 return;
@@ -265,7 +308,8 @@ namespace TwinCatVariableViewer
             // Writing xml
             try
             {
-                using (XmlWriter writer = XmlWriter.Create("VariableDump.xml"))
+                XmlWriterSettings settings = new XmlWriterSettings { Indent = true };
+                using (XmlWriter writer = XmlWriter.Create("VariableDump.xml", settings))
                 {
                     writer.WriteStartDocument();
                     writer.WriteStartElement("Symbols");
@@ -274,12 +318,12 @@ namespace TwinCatVariableViewer
                     {
                         writer.WriteStartElement("Symbol");
 
-                        writer.WriteElementString("Path", SymbolListViewItems[i].Path);
-                        writer.WriteElementString("Type", SymbolListViewItems[i].Type);
-                        writer.WriteElementString("IndexGroup", SymbolListViewItems[i].IndexGroup.ToString());
-                        writer.WriteElementString("IndexOffset", SymbolListViewItems[i].IndexOffset.ToString());
-                        writer.WriteElementString("Size", SymbolListViewItems[i].Size.ToString());
-                        writer.WriteElementString("CurrentValue", _symbolValues[i].ToString());
+                        writer.WriteElementString("Path", ReplaceHexadecimalSymbols(SymbolListViewItems[i].Path));
+                        writer.WriteElementString("Type", ReplaceHexadecimalSymbols(SymbolListViewItems[i].Type));
+                        writer.WriteElementString("IndexGroup", ReplaceHexadecimalSymbols(SymbolListViewItems[i].IndexGroup.ToString()));
+                        writer.WriteElementString("IndexOffset", ReplaceHexadecimalSymbols(SymbolListViewItems[i].IndexOffset.ToString()));
+                        writer.WriteElementString("Size", ReplaceHexadecimalSymbols(SymbolListViewItems[i].Size.ToString()));
+                        writer.WriteElementString("CurrentValue", ReplaceHexadecimalSymbols(_symbolValues[i].ToString()));
 
                         writer.WriteEndElement();
                     }
@@ -288,9 +332,12 @@ namespace TwinCatVariableViewer
                     writer.WriteEndDocument();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                UpdateDumpStatus("Cannot access 'VariableDump.xml'. Opened in another application?!", Colors.Orange);
+                Debug.WriteLine(ex.Message);
+                if (ex.Message.StartsWith("The process cannot access the file"))
+                    UpdateDumpStatus("Cannot access 'VariableDump.xml'. Opened in another application?!", Colors.Orange);
+                else UpdateDumpStatus(ex.Message, Colors.Orange);
                 DumpSpinner(false);
                 return;
             }
@@ -308,9 +355,12 @@ namespace TwinCatVariableViewer
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                UpdateDumpStatus("Cannot access 'VariableDump.csv'. Opened in another application?!", Colors.Orange);
+                Debug.WriteLine(ex.Message);
+                if (ex.Message.StartsWith("The process cannot access the file"))
+                    UpdateDumpStatus("Cannot access 'VariableDump.csv'. Opened in another application?!", Colors.Orange);
+                else UpdateDumpStatus(ex.Message, Colors.Orange);
                 DumpSpinner(false);
                 return;
             }
@@ -318,6 +368,17 @@ namespace TwinCatVariableViewer
             UpdateDumpStatus("Done", Colors.GreenYellow);
             DumpSpinner(false);
             //Debug.WriteLine($"Dumping data from PLC to file: {sw.Elapsed}");
+        }
+
+        /// <summary>
+        /// Replace unallowed characters in XML
+        /// </summary>
+        /// <param name="txt">text to parse for unallowed xml characters</param>
+        /// <returns>filtered text</returns>
+        private string ReplaceHexadecimalSymbols(string txt)
+        {
+            string r = "[\x00-\x08\x0B\x0C\x0E-\x1F\x26]";
+            return Regex.Replace(txt, r, "", RegexOptions.Compiled);
         }
 
         private void DumpSpinner(bool show)
@@ -343,6 +404,7 @@ namespace TwinCatVariableViewer
         {
             TextBlockDumpStatus.Dispatcher.BeginInvoke(new Action(() =>
             {
+                text = text.Length <= 120 ? text : $"{text.Substring(0, 120)}...";
                 TextBlockDumpStatus.Text = text;
                 TextBlockDumpStatus.Foreground = new SolidColorBrush(fontColor);
             }));

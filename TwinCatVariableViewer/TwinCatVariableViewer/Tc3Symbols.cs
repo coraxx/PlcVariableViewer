@@ -1,29 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using TwinCAT;
 using TwinCAT.Ads;
 using TwinCAT.Ads.TypeSystem;
 using TwinCAT.TypeSystem;
 
 namespace TwinCatVariableViewer
 {
-    class Tc3Symbols
+    internal class Tc3Symbols
     {
-        public static void AddSymbolRecursive(List<ISymbol> symbols, ISymbol symbol, bool DEBUG = false)
+        public static void AddSymbolRecursive(List<ISymbol> symbols, ISymbol symbol, bool debug = false)
         {
-            IDataType type = symbol.DataType as IDataType;
+            // IDataType type = symbol.DataType as IDataType;
 
             foreach (ITypeAttribute attribute in symbol.Attributes)
             {
-                if (DEBUG) Debug.WriteLine(string.Format("{{ {0} : {1} }}", attribute.Name, attribute.Value));
+                if (debug) Debug.WriteLine($"{attribute.Name} : {attribute.Value}");
             }
 
-            if (DEBUG) Debug.WriteLine(string.Format("{0} : {1} (IG: 0x{2} IO: 0x{3} size: {4})", symbol.InstancePath, symbol.TypeName, ((IAdsSymbol)symbol).IndexGroup.ToString("x"), ((IAdsSymbol)symbol).IndexOffset.ToString("x"), symbol.Size));
+            if (debug) Debug.WriteLine(
+                $"{symbol.InstancePath} : {symbol.TypeName} (IG: 0x{((IAdsSymbol) symbol).IndexGroup:x} IO: 0x{((IAdsSymbol) symbol).IndexOffset:x} size: {symbol.Size})");
 
             if (symbol.Category == DataTypeCategory.Array)
             {
                 IArrayInstance arrInstance = (IArrayInstance)symbol;
-                IArrayType arrType = (IArrayType)symbol.DataType;
+                // IArrayType arrType = (IArrayType)symbol.DataType;
 
                 int count = 0;
 
@@ -39,7 +41,7 @@ namespace TwinCatVariableViewer
             else if (symbol.Category == DataTypeCategory.Struct)
             {
                 IStructInstance structInstance = (IStructInstance)symbol;
-                IStructType structType = (IStructType)symbol.DataType;
+                // IStructType structType = (IStructType)symbol.DataType;
 
                 foreach (ISymbol member in structInstance.MemberInstances)
                 {
@@ -55,6 +57,7 @@ namespace TwinCatVariableViewer
 
         public static string GetSymbolValue(ISymbol symbol, TcAdsClient plcClient)
         {
+            if (plcClient == null || plcClient.ConnectionState != ConnectionState.Connected) return "No connection";
             string data = "";
             TimeSpan t;
             DateTime dt;
@@ -133,6 +136,7 @@ namespace TwinCatVariableViewer
 
         public static string GetSymbolValue(SymbolInfo symbol, TcAdsClient plcClient)
         {
+            if (plcClient == null || plcClient.ConnectionState != ConnectionState.Connected) return "No connection";
             string data = "";
             TimeSpan t;
             DateTime dt;
