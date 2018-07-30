@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -25,15 +27,20 @@ namespace TwinCatVariableViewer
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow
+    public partial class MainWindow: INotifyPropertyChanged
     {
+        #region Global variables
+
         private TcAdsClient _plcClient;
         private ISymbolLoader _symbolLoader;
         private readonly List<ISymbol> _symbols = new List<ISymbol>();
         private object[] _symbolValues;
         private readonly DispatcherTimer _refreshDataTimer = new DispatcherTimer(DispatcherPriority.Render);
-
         private ScrollViewer _scrollViewer;
+
+        #endregion
+
+        #region Properties
 
         private ObservableCollection<SymbolInfo> _symbolListViewItems = new ObservableCollection<SymbolInfo>();
         public ObservableCollection<SymbolInfo> SymbolListViewItems
@@ -52,18 +59,21 @@ namespace TwinCatVariableViewer
                 {
                     if (value)
                     {
-                        _plcClient.AdsStateChanged += _plcClient_AdsStateChanged;
+                        _refreshDataTimer.IsEnabled = true;
                         _refreshDataTimer.Tick += RefreshDataTimerOnTick;
                     }
                     else
                     {
-                        _plcClient.AdsStateChanged -= _plcClient_AdsStateChanged;
+                        _refreshDataTimer.IsEnabled = false;
                         _refreshDataTimer.Tick -= RefreshDataTimerOnTick;
                     }
                 }
                 _plcConnected = value;
+                OnPropertyChanged("PlcConnected");
             }
         }
+
+            #endregion
 
         #region Check if DLL exists
         [DllImport("kernel32", SetLastError = true)]
@@ -88,7 +98,7 @@ namespace TwinCatVariableViewer
             }
             else
             {
-                DumpData.IsEnabled = false;
+                ButtonDumpData.IsEnabled = false;
                 UpdateDumpStatus("Did not find tcadsdll.dll. Is TwinCat/ADS installed?!", Colors.Red);
             }
         }
@@ -97,8 +107,7 @@ namespace TwinCatVariableViewer
         {
             if (_plcClient != null && _plcClient.ConnectionState == ConnectionState.Connected)
             {
-                PlcConnected = false;
-                _plcClient.Disconnect();
+                DisconnectPlc();
             }
 
             try
@@ -106,17 +115,27 @@ namespace TwinCatVariableViewer
                 _plcClient?.Dispose();
                 _plcClient = new TcAdsClient();
                 _plcClient.Connect("127.0.0.1.1.1", 851);
+                _plcClient.AdsStateChanged += _plcClient_AdsStateChanged;
+                _plcClient.ConnectionStateChanged += PlcClientOnConnectionStateChanged;
+                _plcClient.AmsRouterNotification += PlcClientOnAmsRouterNotification;
                 SymbolLoaderSettings settings = new SymbolLoaderSettings(SymbolsLoadMode.VirtualTree, ValueAccessMode.IndexGroupOffsetPreferred);
                 _symbolLoader = SymbolLoaderFactory.Create(_plcClient, settings);
 
                 StateInfo stateInfo = _plcClient.ReadState();
                 AdsState state = stateInfo.AdsState;
                 DisplayPlcState(state);
-                PlcConnected = (state == AdsState.Run || state == AdsState.Stop);
-                if (PlcConnected)
+                if (state == AdsState.Run || state == AdsState.Stop)
                 {
-                    GetSymbols();
-                    PopulateListView();
+                    PlcConnected = true;
+                    if (PlcConnected)
+                    {
+                        GetSymbols();
+                        PopulateListView();
+                    }
+                }
+                else
+                {
+                    DisconnectPlc();
                 }
             }
             catch (Exception ex)
@@ -125,7 +144,14 @@ namespace TwinCatVariableViewer
                 UpdateDumpStatus($"PLC state: {ex.Message}", Colors.Red);
                 PlcConnected = false;
             }
-            //DumpData.IsEnabled = _plcConnected;
+            ButtonDumpData.IsEnabled = _plcConnected;
+        }
+
+        private void DisconnectPlc()
+        {
+            PlcConnected = false;
+            _plcClient.Disconnect();
+            UpdateDumpStatus("PLC disconnected", Colors.Orange);
         }
 
         private void DisplayPlcState(AdsState state)
@@ -198,14 +224,36 @@ namespace TwinCatVariableViewer
             }
         }
 
+        #region ADS events
+
         private void _plcClient_AdsStateChanged(object sender, AdsStateChangedEventArgs e)
         {
-            StateInfo stateInfo = _plcClient.ReadState();
-            AdsState state = stateInfo.AdsState;
-            DisplayPlcState(state);
-
-            PlcConnected = state == AdsState.Run;
+            Debug.WriteLine($"ADS state changed: {e.State.AdsState}; Device state: {e.State.DeviceState}");
+            DisplayPlcState(e.State.AdsState);
+            PlcConnected = (e.State.AdsState == AdsState.Run || e.State.AdsState == AdsState.Stop);
         }
+
+        private void PlcClientOnConnectionStateChanged(object sender, ConnectionStateChangedEventArgs e)
+        {
+            Debug.WriteLine($"Client connection state was {e.OldState} and is now {e.NewState} because of {e.Reason}");
+            if (e.NewState != ConnectionState.Connected)
+            {
+                PlcConnected = false;
+                UpdateDumpStatus("PLC state: Disconnected", Colors.Red);
+            }
+        }
+
+        private void PlcClientOnAmsRouterNotification(object sender, AmsRouterNotificationEventArgs e)
+        {
+            Debug.WriteLine($"AMS router notification: {e.State}");
+            if (e.State != AmsRouterState.Start)
+            {
+                PlcConnected = false;
+                UpdateDumpStatus("ADS router stopped", Colors.Red);
+            }
+        }
+
+        #endregion
 
         private void GetSymbols()
         {
@@ -221,7 +269,6 @@ namespace TwinCatVariableViewer
             // Get scrollviewer
             Decorator border = VisualTreeHelper.GetChild(SymbolListView, 0) as Decorator;
             if (border != null) _scrollViewer = border.Child as ScrollViewer;
-            _refreshDataTimer.IsEnabled = PlcConnected;
         }
 
         private void RefreshDataTimerOnTick(object sender, EventArgs eventArgs)
@@ -263,7 +310,7 @@ namespace TwinCatVariableViewer
             if (e.Key == Key.Enter) PopulateListView(TextBox1.Text);
         }
 
-        private void ButtonBase_OnClick(object sender, RoutedEventArgs e)
+        private void ButtonFilter_OnClick(object sender, RoutedEventArgs e)
         {
             PopulateListView(TextBox1.Text);
         }
@@ -286,7 +333,7 @@ namespace TwinCatVariableViewer
             //Debug.WriteLine($"Collecting data from PLC: {sw.Elapsed}");
         }
 
-        private async void DumpData_OnClick(object sender, RoutedEventArgs e)
+        private async void ButtonDumpData_OnClick(object sender, RoutedEventArgs e)
         {
             //Stopwatch sw = Stopwatch.StartNew();
             UpdateDumpStatus("Dumping data...", Colors.AliceBlue);
@@ -295,6 +342,13 @@ namespace TwinCatVariableViewer
                 UpdateDumpStatus("PLC not running", Colors.Orange);
                 return;
             }
+
+            if (_symbols.Count == 0)
+            {
+                UpdateDumpStatus("No Symbols to dump", Colors.Orange);
+                return;
+            }
+
             DumpSpinner(true);
             await ReadAll().ConfigureAwait(false);
 
@@ -409,6 +463,17 @@ namespace TwinCatVariableViewer
                 TextBlockDumpStatus.Foreground = new SolidColorBrush(fontColor);
             }));
         }
-    }
 
+        private void ButtonReconnect_OnClick(object sender, RoutedEventArgs e)
+        {
+            ConnectPlc();
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
 }

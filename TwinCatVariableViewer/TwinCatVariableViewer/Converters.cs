@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 
@@ -30,6 +31,33 @@ namespace TwinCatVariableViewer
             CultureInfo culture)
         {
             throw new NotImplementedException();
+        }
+    }
+
+    [ValueConversion(typeof(object), typeof(Visibility))]
+    public class ValueToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null)
+            {
+                return Visibility.Hidden;
+            }
+
+            var boolValue = System.Convert.ToBoolean(value);
+            if (parameter?.ToString() == "Invert") boolValue = !boolValue;
+
+            if (boolValue)
+            {
+                return Visibility.Visible;
+            }
+
+            return Visibility.Hidden;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return null;
         }
     }
 
