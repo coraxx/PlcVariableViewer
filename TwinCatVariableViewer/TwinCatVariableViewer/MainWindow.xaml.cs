@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -31,7 +30,12 @@ namespace TwinCatVariableViewer
     {
         #region Global variables
 
-        private TcAdsClient _plcClient;
+        //private TcAdsClient _plcClient;
+
+        private AdsSession _session;
+        private AdsConnection _connection;
+        private readonly SymbolLoaderSettings _symbolLoaderSettings = new SymbolLoaderSettings(SymbolsLoadMode.VirtualTree, ValueAccessMode.IndexGroupOffsetPreferred);
+
         private ISymbolLoader _symbolLoader;
         private readonly List<ISymbol> _symbols = new List<ISymbol>();
         private object[] _symbolValues;
@@ -106,23 +110,24 @@ namespace TwinCatVariableViewer
 
         private void ConnectPlc()
         {
-            if (_plcClient != null && _plcClient.ConnectionState == ConnectionState.Connected)
+            if (_session != null && _connection.ConnectionState == ConnectionState.Connected)
             {
                 DisconnectPlc();
             }
 
             try
             {
-                _plcClient?.Dispose();
-                _plcClient = new TcAdsClient();
-                _plcClient.Connect("127.0.0.1.1.1", 851);
-                _plcClient.AdsStateChanged += _plcClient_AdsStateChanged;
-                _plcClient.ConnectionStateChanged += PlcClientOnConnectionStateChanged;
-                _plcClient.AmsRouterNotification += PlcClientOnAmsRouterNotification;
-                SymbolLoaderSettings settings = new SymbolLoaderSettings(SymbolsLoadMode.VirtualTree, ValueAccessMode.IndexGroupOffsetPreferred);
-                _symbolLoader = SymbolLoaderFactory.Create(_plcClient, settings);
+                _session?.Dispose();
+                _session = new AdsSession(new AmsAddress("127.0.0.1.1.1:851"), SessionSettings.Default);
+                _connection = (AdsConnection)_session.Connect();
 
-                StateInfo stateInfo = _plcClient.ReadState();
+                _connection.AdsStateChanged += _plcClient_AdsStateChanged;
+                _connection.ConnectionStateChanged += PlcClientOnConnectionStateChanged;
+                _connection.AmsRouterNotification += PlcClientOnAmsRouterNotification;
+
+                _symbolLoader = SymbolLoaderFactory.Create(_connection, _symbolLoaderSettings);
+
+                StateInfo stateInfo = _connection.ReadState();
                 AdsState state = stateInfo.AdsState;
                 DisplayPlcState(state);
                 if (state == AdsState.Run || state == AdsState.Stop)
@@ -151,7 +156,7 @@ namespace TwinCatVariableViewer
         private void DisconnectPlc()
         {
             PlcConnected = false;
-            _plcClient.Disconnect();
+            _connection.Disconnect();
             UpdateDumpStatus("PLC disconnected", Colors.Orange);
         }
 
@@ -279,7 +284,7 @@ namespace TwinCatVariableViewer
             for (int i = 0; i < (int)_scrollViewer.ViewportHeight; i++)
             {
                 SymbolInfo symbol = SymbolListViewItems[(int)_scrollViewer.VerticalOffset + i];
-                SymbolListViewItems[(int)_scrollViewer.VerticalOffset + i].CurrentValue = Tc3Symbols.GetSymbolValue(symbol, _plcClient);
+                SymbolListViewItems[(int)_scrollViewer.VerticalOffset + i].CurrentValue = Tc3Symbols.GetSymbolValue(symbol, _connection);
             }
             //Debug.WriteLine($"Collecting data from PLC for ListView: {sw.Elapsed}");
         }
@@ -326,7 +331,7 @@ namespace TwinCatVariableViewer
                 symbolColl.Add(symbol);
             }
 
-            SumSymbolRead sumSymbolRead = new SumSymbolRead(_plcClient, symbolColl);
+            SumSymbolRead sumSymbolRead = new SumSymbolRead(_connection, symbolColl);
             await Task.Run(() =>
             {
                 _symbolValues = sumSymbolRead.Read();
