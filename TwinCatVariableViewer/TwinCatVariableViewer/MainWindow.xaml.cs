@@ -99,6 +99,7 @@ namespace TwinCatVariableViewer
             else
             {
                 ButtonDumpData.IsEnabled = false;
+                ButtonReconnect.IsEnabled = false;
                 UpdateDumpStatus("Did not find tcadsdll.dll. Is TwinCat/ADS installed?!", Colors.Red);
             }
         }
