@@ -63,9 +63,11 @@
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="*"/>
 				<ColumnDefinition Width="60"/>
+				<ColumnDefinition Width="100"/>
 			</Grid.ColumnDefinitions>
 			<TextBox x:Name="TextBox1" Grid.Column="0" Height="20" KeyUp="TextBox1_OnKeyUp" Margin="10,10,5,0" Background="{StaticResource BackgroundLightBrush}"/>
-			<Button Grid.Column="1" Content="Filter" Height="20" Margin="5,10,10,0" Click="ButtonFilter_OnClick"/>
+			<Button Grid.Column="1" Content="Filter" Height="20" Margin="5,10,5,0" Click="ButtonFilter_OnClick"/>
+			<ComboBox x:Name="ComboBoxPlc" Grid.Column="2" Height="20" Margin="5,10,10,0" SelectionChanged="ComboBoxPlc_OnSelectionChanged"/>
 		</Grid>
 		<ListView x:Name="SymbolListView" Grid.Row="1" SelectionMode="Single" Style="{x:Null}" Margin="10,5,10,10" Background="{StaticResource BackgroundLightBrush}"
 		          ItemContainerStyle="{StaticResource ListViewItemStyle}" ItemsSource="{Binding SymbolListViewItems}">

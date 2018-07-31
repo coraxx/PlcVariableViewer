@@ -72,7 +72,9 @@ namespace TwinCatVariableViewer
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                OnPlcConnectionError(new PlcConnectionErrorEventArgs(ex.Message));
+                string port = (Session == null) ? String.Empty : $"Port {Session.Port}: ";
+                OnPlcConnectionError(new PlcConnectionErrorEventArgs($"{port}{ex.Message}"));
+                Disconnect();
             }
         }
 

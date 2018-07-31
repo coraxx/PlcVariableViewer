@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -29,13 +31,16 @@ namespace TwinCatVariableViewer
         #region Global variables
         
         private object[] _symbolValues;
+        private IEnumerable<int> _activePorts;
 
         private readonly DispatcherTimer _refreshDataTimer = new DispatcherTimer(DispatcherPriority.Render);
         private ScrollViewer _scrollViewer;
 
-        private PlcConnection _plc1;
+        private List<PlcConnection> _plcConnections = new List<PlcConnection>();
 
-        #endregion
+        private int _activePlc;
+
+        #endregion  
 
         #region Properties
 
@@ -103,28 +108,104 @@ namespace TwinCatVariableViewer
 
         private void ConnectPlc()
         {
-            _plc1 = new PlcConnection(new AmsAddress("127.0.0.1.1.1:851"));
-            _plc1.PlcConnectionError += Plc1OnPlcConnectionError;
-            _plc1.Connect();
-            if (_plc1.Connected)
+            _activePlc = 0;
+            _activePorts = GetActivePlcPorts("127.0.0.1.1.1", 851);
+            _plcConnections.Clear();
+            ComboBoxPlc.Items.Clear();
+            SymbolListViewItems?.Clear();
+            foreach (int port in _activePorts)
             {
-                _plc1.Connection.AdsStateChanged += PlcAdsStateChanged;
-                _plc1.Connection.ConnectionStateChanged += PlcOnConnectionStateChanged;
-                _plc1.Connection.AmsRouterNotification += PlcOnAmsRouterNotification;
+                PlcConnection plcCon = new PlcConnection(new AmsAddress($"127.0.0.1.1.1:{port}"));
+                plcCon.PlcConnectionError += PlcOnPlcConnectionError;
+                plcCon.Connect();
+                if (plcCon.Connected)
+                {
+                    plcCon.Connection.AdsStateChanged += PlcAdsStateChanged;
+                    plcCon.Connection.ConnectionStateChanged += PlcOnConnectionStateChanged;
+                    plcCon.Connection.AmsRouterNotification += PlcOnAmsRouterNotification;
+                }
+                _plcConnections.Add(plcCon);
+            }
+            
+            if (_plcConnections.Count == 0)
+            {
+                UpdateDumpStatus("No active PLCs found", Colors.Orange);
+                return;
+            }
+
+            if (_plcConnections[_activePlc].Connected)
+            {
                 PopulateListView();
             }
 
-            PlcConnected = _plc1.Connected;
-            ButtonDumpData.IsEnabled = _plc1.Connected;
+            // Populate Combobox
+            if (_plcConnections.Count > 0)
+            {
+                foreach (int activePort in _activePorts)
+                {
+                    ComboBoxItem cbi = new ComboBoxItem();
+                    cbi.Content = activePort.ToString();
+                    this.ComboBoxPlc.Items.Add(cbi);
+                }
+
+                ComboBoxPlc.SelectedIndex = 0;
+            }
+
+            PlcConnected = _plcConnections[_activePlc].Connected;
+            ButtonDumpData.IsEnabled = PlcConnected;
         }
 
-        private void Plc1OnPlcConnectionError(object sender, PlcConnectionErrorEventArgs e)
+        private void PlcOnPlcConnectionError(object sender, PlcConnectionErrorEventArgs e)
         {
             UpdateDumpStatus(e.Message, Colors.Red);
+            PlcConnected = _plcConnections[_activePlc].Connected;
+        }
+
+        /// <summary>
+        /// Get active ports from PLC. This simply tries to establish a connection to the PLC with the starting port
+        /// and increases that by one. After 5 ports with unsuccessful connection this function returns a list of port numbers
+        /// </summary>
+        /// <param name="amsIp">PLC AMS IP</param>
+        /// <param name="startPort">Start port, increased by one after succesful connection</param>
+        /// <returns>IEnumerable of int with active ports</returns>
+        private static IEnumerable<int> GetActivePlcPorts(string amsIp, int startPort)
+        {
+            List<int> activePorts = new List<int>();
+            int port = startPort;
+            int unsuccessfulAttempts = 0;
+            while (true)
+            {
+                if (unsuccessfulAttempts >= 5 || activePorts.Count >= 25) break;
+                using (AdsSession session = new AdsSession(new AmsAddress($"{amsIp}:{port}")))
+                {
+                    session.Connect();
+                    try
+                    {
+                        StateInfo stateInfo = session.Connection.ReadState();
+                        if (stateInfo.AdsState != AdsState.Invalid)
+                        {
+                            activePorts.Add(port);
+                        }
+                        else
+                        {
+                            unsuccessfulAttempts++;
+                        }
+                        session.Disconnect();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                        break;
+                    }
+                }
+                port++;
+            }
+
+            return activePorts;
         }
 
         private void DisplayPlcState(AdsState state)
-        {
+        {   
             switch (state)
             {
                 case AdsState.Invalid:
@@ -238,7 +319,7 @@ namespace TwinCatVariableViewer
             for (int i = 0; i < (int)_scrollViewer.ViewportHeight; i++)
             {
                 SymbolInfo symbol = SymbolListViewItems[(int)_scrollViewer.VerticalOffset + i];
-                SymbolListViewItems[(int)_scrollViewer.VerticalOffset + i].CurrentValue = Tc3Symbols.GetSymbolValue(symbol, _plc1.Connection);
+                SymbolListViewItems[(int)_scrollViewer.VerticalOffset + i].CurrentValue = Tc3Symbols.GetSymbolValue(symbol, _plcConnections[_activePlc].Connection);
             }
             //Debug.WriteLine($"Collecting data from PLC for ListView: {sw.Elapsed}");
         }
@@ -246,8 +327,9 @@ namespace TwinCatVariableViewer
         private void PopulateListView(string filterName = null)
         {
             SymbolListViewItems?.Clear();
+            if (_plcConnections.Count == 0) return;
 
-            foreach (ISymbol symbol in _plc1.Symbols)
+            foreach (ISymbol symbol in _plcConnections[_activePlc].Symbols)
             {
                 if (filterName == null || symbol.InstancePath.ToLower().Contains(filterName.ToLower()))
                 {
@@ -275,17 +357,17 @@ namespace TwinCatVariableViewer
             PopulateListView(TextBox1.Text);
         }
 
-        private async Task ReadAll()
+        private async Task ReadAll(PlcConnection plcCon)
         {
             //Stopwatch sw = Stopwatch.StartNew();
             SymbolCollection symbolColl = new SymbolCollection();
 
-            foreach (var symbol in _plc1.Symbols)
+            foreach (var symbol in plcCon.Symbols)
             {
                 symbolColl.Add(symbol);
             }
 
-            SumSymbolRead sumSymbolRead = new SumSymbolRead(_plc1.Connection, symbolColl);
+            SumSymbolRead sumSymbolRead = new SumSymbolRead(plcCon.Connection, symbolColl);
             await Task.Run(() =>
             {
                 _symbolValues = sumSymbolRead.Read();
@@ -296,87 +378,90 @@ namespace TwinCatVariableViewer
         private async void ButtonDumpData_OnClick(object sender, RoutedEventArgs e)
         {
             //Stopwatch sw = Stopwatch.StartNew();
-            UpdateDumpStatus("Dumping data...", Colors.AliceBlue);
-            if (!PlcConnected)
-            {
-                UpdateDumpStatus("PLC not running", Colors.Orange);
-                return;
-            }
-
-            if (_plc1.Symbols.Count == 0)
-            {
-                UpdateDumpStatus("No Symbols to dump", Colors.Orange);
-                return;
-            }
-
             DumpSpinner(true);
-            await ReadAll().ConfigureAwait(false);
-
-            if (_symbolValues.Length != _plc1.Symbols.Count)
+            foreach (PlcConnection plcConnection in _plcConnections)
             {
-                UpdateDumpStatus("Error dumping data: Missmatch in symbol array sizes!", Colors.Red);
-                DumpSpinner(false);
-                return;
-            }
-
-            // Writing xml
-            try
-            {
-                XmlWriterSettings settings = new XmlWriterSettings { Indent = true };
-                using (XmlWriter writer = XmlWriter.Create("VariableDump.xml", settings))
+                UpdateDumpStatus("Dumping data...", Colors.AliceBlue);
+                if (!PlcConnected)
                 {
-                    writer.WriteStartDocument();
-                    writer.WriteStartElement("Symbols");
+                    UpdateDumpStatus($"PLC {plcConnection.Session.Port} not running", Colors.Orange);
+                    return;
+                }
 
-                    for (var i = 0; i < _symbolValues.Length; i++)
+                if (plcConnection.Symbols.Count == 0)
+                {
+                    UpdateDumpStatus($"No Symbols to dump for port: {plcConnection.Session.Port}", Colors.Orange);
+                    return;
+                }
+
+                await ReadAll(plcConnection).ConfigureAwait(false);
+
+                if (_symbolValues.Length != plcConnection.Symbols.Count)
+                {
+                    UpdateDumpStatus("Error dumping data: Missmatch in symbol array sizes!", Colors.Red);
+                    DumpSpinner(false);
+                    return;
+                }
+
+                // Writing xml
+                try
+                {
+                    XmlWriterSettings settings = new XmlWriterSettings { Indent = true };
+                    using (XmlWriter writer = XmlWriter.Create($"VariableDump_{plcConnection.Session.Port}.xml", settings))
                     {
-                        writer.WriteStartElement("Symbol");
+                        writer.WriteStartDocument();
+                        writer.WriteStartElement("Symbols");
 
-                        writer.WriteElementString("Path", ReplaceHexadecimalSymbols(SymbolListViewItems[i].Path));
-                        writer.WriteElementString("Type", ReplaceHexadecimalSymbols(SymbolListViewItems[i].Type));
-                        writer.WriteElementString("IndexGroup", ReplaceHexadecimalSymbols(SymbolListViewItems[i].IndexGroup.ToString()));
-                        writer.WriteElementString("IndexOffset", ReplaceHexadecimalSymbols(SymbolListViewItems[i].IndexOffset.ToString()));
-                        writer.WriteElementString("Size", ReplaceHexadecimalSymbols(SymbolListViewItems[i].Size.ToString()));
-                        writer.WriteElementString("CurrentValue", ReplaceHexadecimalSymbols(_symbolValues[i].ToString()));
+                        for (var i = 0; i < _symbolValues.Length; i++)
+                        {
+                            writer.WriteStartElement("Symbol");
+
+                            writer.WriteElementString("Path", ReplaceHexadecimalSymbols(plcConnection.Symbols[i].InstancePath));
+                            writer.WriteElementString("Type", ReplaceHexadecimalSymbols(plcConnection.Symbols[i].TypeName));
+                            writer.WriteElementString("IndexGroup", ReplaceHexadecimalSymbols(((IAdsSymbol)plcConnection.Symbols[i]).IndexGroup.ToString()));
+                            writer.WriteElementString("IndexOffset", ReplaceHexadecimalSymbols(((IAdsSymbol)plcConnection.Symbols[i]).IndexOffset.ToString()));
+                            writer.WriteElementString("Size", ReplaceHexadecimalSymbols(plcConnection.Symbols[i].Size.ToString()));
+                            writer.WriteElementString("CurrentValue", ReplaceHexadecimalSymbols(_symbolValues[i].ToString()));
+
+                            writer.WriteEndElement();
+                        }
 
                         writer.WriteEndElement();
+                        writer.WriteEndDocument();
                     }
-
-                    writer.WriteEndElement();
-                    writer.WriteEndDocument();
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex.Message);
-                if (ex.Message.StartsWith("The process cannot access the file"))
-                    UpdateDumpStatus("Cannot access 'VariableDump.xml'. Opened in another application?!", Colors.Orange);
-                else UpdateDumpStatus(ex.Message, Colors.Orange);
-                DumpSpinner(false);
-                return;
-            }
-
-            // Writing csv
-            try
-            {
-                using (var w = new StreamWriter("VariableDump.csv"))
+                catch (Exception ex)
                 {
-                    string delimiter = ";";
-                    for (var i = 0; i < _symbolValues.Length; i++)
+                    Debug.WriteLine(ex.Message);
+                    if (ex.Message.StartsWith("The process cannot access the file"))
+                        UpdateDumpStatus($"Cannot access 'VariableDump_{plcConnection.Session.Port}.xml'. Opened in another application?!", Colors.Orange);
+                    else UpdateDumpStatus(ex.Message, Colors.Orange);
+                    DumpSpinner(false);
+                    return;
+                }
+
+                // Writing csv
+                try
+                {
+                    using (var w = new StreamWriter($"VariableDump_{plcConnection.Session.Port}.csv"))
                     {
-                        w.WriteLine($"{SymbolListViewItems[i].Path}{delimiter}{SymbolListViewItems[i].Type}{delimiter}{SymbolListViewItems[i].IndexGroup}{delimiter}{SymbolListViewItems[i].IndexOffset}{delimiter}{SymbolListViewItems[i].Size}{delimiter}{_symbolValues[i]}");
-                        w.Flush();
+                        string delimiter = ";";
+                        for (var i = 0; i < _symbolValues.Length; i++)
+                        {
+                            w.WriteLine($"{plcConnection.Symbols[i].InstancePath}{delimiter}{plcConnection.Symbols[i].TypeName}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexGroup}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexOffset}{delimiter}{plcConnection.Symbols[i].Size}{delimiter}{_symbolValues[i]}");
+                            w.Flush();
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex.Message);
-                if (ex.Message.StartsWith("The process cannot access the file"))
-                    UpdateDumpStatus("Cannot access 'VariableDump.csv'. Opened in another application?!", Colors.Orange);
-                else UpdateDumpStatus(ex.Message, Colors.Orange);
-                DumpSpinner(false);
-                return;
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                    if (ex.Message.StartsWith("The process cannot access the file"))
+                        UpdateDumpStatus($"Cannot access 'VariableDump_{plcConnection.Session.Port}.csv'. Opened in another application?!", Colors.Orange);
+                    else UpdateDumpStatus(ex.Message, Colors.Orange);
+                    DumpSpinner(false);
+                    return;
+                }
             }
 
             UpdateDumpStatus("Done", Colors.GreenYellow);
@@ -434,6 +519,12 @@ namespace TwinCatVariableViewer
         protected virtual void OnPropertyChanged(string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private void ComboBoxPlc_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _activePlc = ComboBoxPlc.SelectedIndex >= 0 ? ComboBoxPlc.SelectedIndex : 0;
+            PopulateListView();
         }
     }
 }
