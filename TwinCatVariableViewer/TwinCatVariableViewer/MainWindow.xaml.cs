@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -145,7 +144,7 @@ namespace TwinCatVariableViewer
                 {
                     ComboBoxItem cbi = new ComboBoxItem();
                     cbi.Content = activePort.ToString();
-                    this.ComboBoxPlc.Items.Add(cbi);
+                    ComboBoxPlc.Items.Add(cbi);
                 }
 
                 ComboBoxPlc.SelectedIndex = 0;
@@ -168,7 +167,7 @@ namespace TwinCatVariableViewer
         /// <param name="amsIp">PLC AMS IP</param>
         /// <param name="startPort">Start port, increased by one after succesful connection</param>
         /// <returns>IEnumerable of int with active ports</returns>
-        private static IEnumerable<int> GetActivePlcPorts(string amsIp, int startPort)
+        private static int[] GetActivePlcPorts(string amsIp, int startPort)
         {
             List<int> activePorts = new List<int>();
             int port = startPort;
@@ -201,7 +200,7 @@ namespace TwinCatVariableViewer
                 port++;
             }
 
-            return activePorts;
+            return activePorts.ToArray();
         }
 
         private void DisplayPlcState(AdsState state)

@@ -12,46 +12,71 @@ namespace TwinCatVariableViewer
     {
         public static void AddSymbolRecursive(List<ISymbol> symbols, ISymbol symbol, bool debug = false)
         {
-            // IDataType type = symbol.DataType as IDataType;
-
-            foreach (ITypeAttribute attribute in symbol.Attributes)
+            try
             {
-                if (debug) Debug.WriteLine($"{attribute.Name} : {attribute.Value}");
-            }
-
-            if (debug) Debug.WriteLine(
-                $"{symbol.InstancePath} : {symbol.TypeName} (IG: 0x{((IAdsSymbol) symbol).IndexGroup:x} IO: 0x{((IAdsSymbol) symbol).IndexOffset:x} size: {symbol.Size})");
-
-            if (symbol.Category == DataTypeCategory.Array)
-            {
-                IArrayInstance arrInstance = (IArrayInstance)symbol;
-                // IArrayType arrType = (IArrayType)symbol.DataType;
-
-                int count = 0;
-
-                foreach (ISymbol arrayElement in arrInstance.Elements)
+                if (symbol.DataType == null)
+                    return;
+                if (symbol.DataType.Name.StartsWith("TC2_MC2."))
+                    return;
+                if (symbol.TypeName == "TC2_MC2.MC_Power")
+                    Console.WriteLine();
+                foreach (ITypeAttribute attribute in symbol.Attributes)
                 {
-                    AddSymbolRecursive(symbols, arrayElement);
-                    count++;
+                    if (debug) Debug.WriteLine($"{attribute.Name} : {attribute.Value}");
+                }
 
-                    if (count > 20) // Write only the first 20 to limit output
-                        break;
+                if (debug) Debug.WriteLine(
+                    $"{symbol.InstancePath} : {symbol.TypeName} (IG: 0x{((IAdsSymbol)symbol).IndexGroup:x} IO: 0x{((IAdsSymbol)symbol).IndexOffset:x} size: {symbol.Size})");
+
+                if (symbol.Category == DataTypeCategory.Array)
+                {
+                    IArrayInstance arrInstance = (IArrayInstance)symbol;
+                    //IArrayType arrType = (IArrayType)symbol.DataType;
+
+                    if (arrInstance.Elements != null)
+                    {
+                        // int count = 0;
+                        foreach (ISymbol arrayElement in arrInstance.Elements)
+                        {
+                            AddSymbolRecursive(symbols, arrayElement);
+                            
+                            //count++;
+                            //if (count > 20) // Write only the first 20 to limit output
+                            //    break;
+                        }
+                    }
+                    else Debug.WriteLine($"Array elements of {arrInstance.TypeName} are null");
+                }
+                else if (symbol.Category == DataTypeCategory.Struct)
+                {
+                    IStructInstance structInstance = (IStructInstance)symbol;
+                    //IStructType structType = (IStructType)symbol.DataType;
+                    try
+                    {
+                        foreach (ISymbol member in structInstance.MemberInstances)
+                        {
+                            AddSymbolRecursive(symbols, member);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+                }
+                else if (symbol.Category == DataTypeCategory.Reference)
+                {
+                    // "REFERENCE TO ..." cannot be read, so filter it out. Comes from InOut variables in function blocks
+                    // pass
+                }
+                else
+                {
+                    symbols.Add(symbol);
                 }
             }
-            else if (symbol.Category == DataTypeCategory.Struct)
+            catch (Exception ex)
             {
-                IStructInstance structInstance = (IStructInstance)symbol;
-                // IStructType structType = (IStructType)symbol.DataType;
-
-                foreach (ISymbol member in structInstance.MemberInstances)
-                {
-                    AddSymbolRecursive(symbols, member);
-                }
-            }
-            else
-            {
-                // "REFERENCE TO ..." cannot be read, so filter it out. Comes from InOut variables in function blocks
-                if (!symbol.TypeName.Contains("REFERENCE")) symbols.Add(symbol);
+                Debug.WriteLine(ex.Message);
+                throw;
             }
         }
 
@@ -130,6 +155,13 @@ namespace TwinCatVariableViewer
                         dt = new DateTime(1970, 1, 1);
                         dt = dt.AddSeconds((uint)plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(uint)));
                         data = $"DT#{dt.Year}-{dt.Month}-{dt.Day}-{dt.Hour}:{dt.Minute}:{dt.Second}";
+                        break;
+                    default:
+                        if (symbol.TypeName.StartsWith("STRING"))
+                        {
+                            int charCount = Convert.ToInt32(symbol.TypeName.Replace("STRING(", "").Replace(")", ""));
+                            data = plcClient.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(string), new[] { charCount }).ToString();
+                        }
                         break;
                 }
             }
@@ -216,6 +248,13 @@ namespace TwinCatVariableViewer
                         dt = new DateTime(1970, 1, 1);
                         dt = dt.AddSeconds((uint)connection.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(uint)));
                         data = $"DT#{dt.Year}-{dt.Month}-{dt.Day}-{dt.Hour}:{dt.Minute}:{dt.Second}";
+                        break;
+                    default:
+                        if (symbol.TypeName.StartsWith("STRING"))
+                        {
+                            int charCount = Convert.ToInt32(symbol.TypeName.Replace("STRING(", "").Replace(")", ""));
+                            data = connection.ReadAny(((IAdsSymbol)symbol).IndexGroup, ((IAdsSymbol)symbol).IndexOffset, typeof(string), new[] { charCount }).ToString();
+                        }
                         break;
                 }
             }
@@ -323,7 +362,7 @@ namespace TwinCatVariableViewer
         public static string GetSymbolValue(SymbolInfo symbol, AdsConnection connection)
         {
             if (connection == null || connection.ConnectionState != ConnectionState.Connected) return "No connection";
-            string data = "";
+            string data;
             try
             {
                 TimeSpan t;
@@ -372,6 +411,9 @@ namespace TwinCatVariableViewer
                     case "DWORD":
                         data = connection.ReadAny((uint)symbol.IndexGroup, (uint)symbol.IndexOffset, typeof(uint)).ToString();
                         break;
+                    case "ENUM":
+                        data = connection.ReadAny((uint)symbol.IndexGroup, (uint)symbol.IndexOffset, typeof(IEnumValue)).ToString();
+                        break;
                     case "TIME":
                         t = TimeSpan.FromMilliseconds((uint)connection.ReadAny((uint)symbol.IndexGroup, (uint)symbol.IndexOffset, typeof(uint)));
                         if (t.Minutes > 0) data = $"T#{t.Minutes}m{t.Seconds}s{t.Milliseconds}ms";
@@ -401,6 +443,10 @@ namespace TwinCatVariableViewer
                         {
                             int charCount = Convert.ToInt32(symbol.Type.Replace("STRING(", "").Replace(")", ""));
                             data = connection.ReadAny((uint)symbol.IndexGroup, (uint)symbol.IndexOffset, typeof(string), new[] { charCount }).ToString();
+                        }
+                        else
+                        {
+                            data = connection.ReadAny((uint)symbol.IndexGroup, (uint)symbol.IndexOffset, typeof(string), new[] { symbol.Size }).ToString();
                         }
                         break;
                 }
