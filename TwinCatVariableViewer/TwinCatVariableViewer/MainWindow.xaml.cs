@@ -402,7 +402,7 @@ namespace TwinCatVariableViewer
                     return;
                 }
 
-                // Writing xml
+                // Write xml
                 try
                 {
                     XmlWriterSettings settings = new XmlWriterSettings { Indent = true };
@@ -439,7 +439,7 @@ namespace TwinCatVariableViewer
                     return;
                 }
 
-                // Writing csv
+                // Write csv
                 try
                 {
                     using (var w = new StreamWriter($"VariableDump_{plcConnection.Session.Port}.csv"))

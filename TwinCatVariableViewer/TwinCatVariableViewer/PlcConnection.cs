@@ -12,23 +12,23 @@ namespace TwinCatVariableViewer
 {
     public class PlcConnection : INotifyPropertyChanged
     {
-        private AmsAddress _address;
-        public AdsSession Session { get; private set; }
-        public AdsConnection Connection { get; private set; }
+        #region Variables
 
+        private AmsAddress _address;
         private readonly SymbolLoaderSettings _symbolLoaderSettings = new SymbolLoaderSettings(SymbolsLoadMode.VirtualTree, ValueAccessMode.IndexGroupOffsetPreferred);
         private ISymbolLoader _symbolLoader;
-        public List<ISymbol> Symbols { get; private set; } = new List<ISymbol>();
-
-        #region Events
-
-        public event PlcConnectionErrorEventHandler PlcConnectionError;
 
         #endregion
 
+        #region Properties
+
+        public AdsSession Session { get; private set; }
+        public AdsConnection Connection { get; private set; }
+        public List<ISymbol> Symbols { get; private set; } = new List<ISymbol>();
+
         private bool _connected;
         public bool Connected
-        {   
+        {
             get { return _connected; }
             private set
             {
@@ -37,13 +37,29 @@ namespace TwinCatVariableViewer
             }
         }
 
+        #endregion
+
+        #region Events
+
+        public event PlcConnectionErrorEventHandler PlcConnectionError;
+
+        #endregion
+
+        /// <summary>
+        /// CTOR
+        /// </summary>
+        /// <param name="address">PLC AMS address</param>
         public PlcConnection(AmsAddress address)
         {
             _address = address;
         }
 
+        /// <summary>
+        /// Connect to PLC
+        /// </summary>
         public void Connect()
         {
+            // If already connected, disconnect first
             if (Session != null && Connection.ConnectionState == ConnectionState.Connected)
             {
                 Disconnect();
@@ -78,12 +94,18 @@ namespace TwinCatVariableViewer
             }
         }
 
+        /// <summary>
+        /// Wrapper for disconnecting from PLC
+        /// </summary>
         public void Disconnect()
         {
             Connected = false;
             Connection.Disconnect();
         }
 
+        /// <summary>
+        /// Get symbols (variables) from PLC
+        /// </summary>
         private void GetSymbols()
         {
             Symbols.Clear();
@@ -93,6 +115,13 @@ namespace TwinCatVariableViewer
             }
         }
 
+        protected virtual void OnPlcConnectionError(PlcConnectionErrorEventArgs e)
+        {
+            PlcConnectionError?.Invoke(this, e);
+        }
+
+        #region INotifyPropertyChanged Implementation
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName = null)
@@ -100,10 +129,7 @@ namespace TwinCatVariableViewer
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        protected virtual void OnPlcConnectionError(PlcConnectionErrorEventArgs e)
-        {
-            PlcConnectionError?.Invoke(this, e);
-        }
+        #endregion
     }
 
     public delegate void PlcConnectionErrorEventHandler(object sender, PlcConnectionErrorEventArgs e);

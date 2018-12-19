@@ -8,6 +8,9 @@ using TwinCAT.TypeSystem;
 
 namespace TwinCatVariableViewer
 {
+    /// <summary>
+    /// Methods for extracting/parsing symbols
+    /// </summary>
     internal class Tc3Symbols
     {
         public static void AddSymbolRecursive(List<ISymbol> symbols, ISymbol symbol, bool debug = false)

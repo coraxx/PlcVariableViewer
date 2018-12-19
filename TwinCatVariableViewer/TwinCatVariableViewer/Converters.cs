@@ -6,7 +6,9 @@ using System.Windows.Data;
 
 namespace TwinCatVariableViewer
 {
-
+    /// <summary>
+    /// Convert bool binding to int (0 or 1)
+    /// </summary>
     [ValueConversion(typeof(object), typeof(int))]
     public class BoolToValueConverter : IValueConverter
     {
@@ -34,6 +36,9 @@ namespace TwinCatVariableViewer
         }
     }
 
+    /// <summary>
+    /// Convert bool binding to visibility: true -> visible, false -> hidden
+    /// </summary>
     [ValueConversion(typeof(object), typeof(Visibility))]
     public class ValueToVisibilityConverter : IValueConverter
     {
@@ -61,6 +66,9 @@ namespace TwinCatVariableViewer
         }
     }
 
+    /// <summary>
+    /// Convert ListView item binding to item index int as string 
+    /// </summary>
     [ValueConversion(typeof(object), typeof(string))]
     public class IndexConverter : IValueConverter
     {

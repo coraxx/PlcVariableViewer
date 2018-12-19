@@ -26,15 +26,6 @@
 			<Setter Property="HorizontalContentAlignment" Value="Left"/>
 			<Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
 			<Style.Triggers>
-				<!-- Color of the item depending on percentage value. -->
-				<!--<DataTrigger Binding="{Binding CurrentValue, Converter={StaticResource BoolToValueConverter}}" Value="1" >
-					<Setter Property="Background" Value="GreenYellow" />
-				</DataTrigger>
-
-				<DataTrigger Binding="{Binding CurrentValue, Converter={StaticResource BoolToValueConverter}}" Value="0" >
-					<Setter Property="Background" Value="LightGray" />
-				</DataTrigger>-->
-
 				<!-- Style for the selecting item -->
 				<Trigger Property="IsSelected" Value="true">
 					<Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
@@ -128,7 +119,21 @@
 					<GridViewColumn Header="Current Value" Width="150">
 						<GridViewColumn.CellTemplate>
 							<DataTemplate>
-								<TextBlock Text="{Binding CurrentValue, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Margin="0"/>
+								<Grid>
+									<Border x:Name="CurrentValueBorder" Width="40" Margin="0,1,0,0"/>
+									<TextBlock x:Name="CurrentValueTb" Text="{Binding CurrentValue, Mode=TwoWay}" Margin="0,0,0,0"
+											   HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12"/>
+								</Grid>
+								<DataTemplate.Triggers>
+									<DataTrigger Binding="{Binding Text, ElementName=CurrentValueTb}" Value="True">
+										<Setter TargetName="CurrentValueBorder" Property="Background" Value="GreenYellow" />
+										<Setter TargetName="CurrentValueTb" Property="Foreground" Value="Black" />
+									</DataTrigger>
+									<DataTrigger Binding="{Binding Text, ElementName=CurrentValueTb}" Value="False">
+										<Setter TargetName="CurrentValueBorder" Property="Background" Value="Silver" />
+										<Setter TargetName="CurrentValueTb" Property="Foreground" Value="Black" />
+									</DataTrigger>
+								</DataTemplate.Triggers>
 							</DataTemplate>
 						</GridViewColumn.CellTemplate>
 					</GridViewColumn>

@@ -3,6 +3,9 @@ using System.Runtime.CompilerServices;
 
 namespace TwinCatVariableViewer
 {
+    /// <summary>
+    /// Class for ListView item
+    /// </summary>
     public class SymbolInfo : INotifyPropertyChanged
     {
         private string _path;
