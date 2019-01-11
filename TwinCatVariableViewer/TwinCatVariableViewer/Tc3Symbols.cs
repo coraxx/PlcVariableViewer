@@ -31,49 +31,50 @@ namespace TwinCatVariableViewer
                 if (debug) Debug.WriteLine(
                     $"{symbol.InstancePath} : {symbol.TypeName} (IG: 0x{((IAdsSymbol)symbol).IndexGroup:x} IO: 0x{((IAdsSymbol)symbol).IndexOffset:x} size: {symbol.Size})");
 
-                if (symbol.Category == DataTypeCategory.Array)
+                switch (symbol.Category)
                 {
-                    IArrayInstance arrInstance = (IArrayInstance)symbol;
-                    //IArrayType arrType = (IArrayType)symbol.DataType;
+                    case DataTypeCategory.Array:
+                        IArrayInstance arrInstance = (IArrayInstance)symbol;
+                        //IArrayType arrType = (IArrayType)symbol.DataType;
 
-                    if (arrInstance.Elements != null)
-                    {
-                        // int count = 0;
-                        foreach (ISymbol arrayElement in arrInstance.Elements)
+                        if (arrInstance.Elements != null)
                         {
-                            AddSymbolRecursive(symbols, arrayElement);
+                            // int count = 0;
+                            foreach (ISymbol arrayElement in arrInstance.Elements)
+                            {
+                                AddSymbolRecursive(symbols, arrayElement);
                             
-                            //count++;
-                            //if (count > 20) // Write only the first 20 to limit output
-                            //    break;
+                                //count++;
+                                //if (count > 20) // Write only the first 20 to limit output
+                                //    break;
+                            }
                         }
-                    }
-                    else Debug.WriteLine($"Array elements of {arrInstance.TypeName} are null");
-                }
-                else if (symbol.Category == DataTypeCategory.Struct)
-                {
-                    IStructInstance structInstance = (IStructInstance)symbol;
-                    //IStructType structType = (IStructType)symbol.DataType;
-                    try
-                    {
-                        foreach (ISymbol member in structInstance.MemberInstances)
+                        else Debug.WriteLine($"Array elements of {arrInstance.TypeName} are null");
+
+                        break;
+                    case DataTypeCategory.Struct:
+                        IStructInstance structInstance = (IStructInstance)symbol;
+                        //IStructType structType = (IStructType)symbol.DataType;
+                        try
                         {
-                            AddSymbolRecursive(symbols, member);
+                            foreach (ISymbol member in structInstance.MemberInstances)
+                            {
+                                AddSymbolRecursive(symbols, member);
+                            }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine(ex.Message);
-                    }
-                }
-                else if (symbol.Category == DataTypeCategory.Reference)
-                {
-                    // "REFERENCE TO ..." cannot be read, so filter it out. Comes from InOut variables in function blocks
-                    // pass
-                }
-                else
-                {
-                    symbols.Add(symbol);
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(ex.Message);
+                        }
+
+                        break;
+                    case DataTypeCategory.Reference:
+                        // "REFERENCE TO ..." cannot be read, so filter it out. Comes from InOut variables in function blocks
+                        // pass
+                        break;
+                    default:
+                        symbols.Add(symbol);
+                        break;
                 }
             }
             catch (Exception ex)

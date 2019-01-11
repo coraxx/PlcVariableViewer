@@ -29,13 +29,13 @@ namespace TwinCatVariableViewer
     {
         #region Fields
         
-        private List<object> _symbolValues = new List<object>();
-        private IEnumerable<int> _activePorts;
+        private readonly List<object> _symbolValues = new List<object>();
+        private int[] _activePorts;
 
         private readonly DispatcherTimer _refreshDataTimer = new DispatcherTimer(DispatcherPriority.Render);
         private ScrollViewer _scrollViewer;
 
-        private List<PlcConnection> _plcConnections = new List<PlcConnection>();
+        private readonly List<PlcConnection> _plcConnections = new List<PlcConnection>();
 
         private int _activePlc;
 
@@ -78,9 +78,9 @@ namespace TwinCatVariableViewer
 
         #region Check if DLL exists
         [DllImport("kernel32", SetLastError = true)]
-        static extern IntPtr LoadLibrary(string lpFileName);
+        private static extern IntPtr LoadLibrary(string lpFileName);
 
-        static bool CheckLibrary(string fileName)
+        private static bool CheckLibrary(string fileName)
         {
             return LoadLibrary(fileName) != IntPtr.Zero;
         }
@@ -169,7 +169,7 @@ namespace TwinCatVariableViewer
         /// </summary>
         /// <param name="amsIp">PLC AMS IP</param>
         /// <param name="startPort">Start port, increased by one after succesful connection</param>
-        /// <returns>IEnumerable of int with active ports</returns>
+        /// <returns>Array of int with active ports</returns>
         private static int[] GetActivePlcPorts(string amsIp, int startPort)
         {
             List<int> activePorts = new List<int>();
@@ -282,27 +282,23 @@ namespace TwinCatVariableViewer
         {
             Debug.WriteLine($"ADS state changed: {e.State.AdsState}; Device state: {e.State.DeviceState}");
             DisplayPlcState(e.State.AdsState);
-            PlcConnected = (e.State.AdsState == AdsState.Run || e.State.AdsState == AdsState.Stop);
+            PlcConnected = e.State.AdsState == AdsState.Run || e.State.AdsState == AdsState.Stop;
         }
 
         private void PlcOnConnectionStateChanged(object sender, ConnectionStateChangedEventArgs e)
         {
             Debug.WriteLine($"Client connection state was {e.OldState} and is now {e.NewState} because of {e.Reason}");
-            if (e.NewState != ConnectionState.Connected)
-            {
-                PlcConnected = false;
-                UpdateDumpStatus("PLC state: Disconnected", Colors.Red);
-            }
+            if (e.NewState == ConnectionState.Connected) return;
+            PlcConnected = false;
+            UpdateDumpStatus("PLC state: Disconnected", Colors.Red);
         }
 
         private void PlcOnAmsRouterNotification(object sender, AmsRouterNotificationEventArgs e)
         {
             Debug.WriteLine($"AMS router notification: {e.State}");
-            if (e.State != AmsRouterState.Start)
-            {
-                PlcConnected = false;
-                UpdateDumpStatus("ADS router stopped", Colors.Red);
-            }
+            if (e.State == AmsRouterState.Start) return;
+            PlcConnected = false;
+            UpdateDumpStatus("ADS router stopped", Colors.Red);
         }
 
         #endregion
@@ -337,7 +333,7 @@ namespace TwinCatVariableViewer
             {
                 if (filterName == null || symbol.InstancePath.ToLower().Contains(filterName.ToLower()))
                 {
-                    SymbolListViewItems?.Add(new SymbolInfo()
+                    SymbolListViewItems?.Add(new SymbolInfo
                     {
                         Path = symbol.InstancePath,
                         Type = symbol.TypeName,
@@ -376,8 +372,8 @@ namespace TwinCatVariableViewer
                     SumSymbolRead sumSymbolRead = new SumSymbolRead(plcCon.Connection, symbolColl);
                     await Task.Run(() =>
                     {
-                        object[] _symbolValuesReturn = sumSymbolRead.Read();
-                        _symbolValues.AddRange(_symbolValuesReturn);
+                        object[] symbolValuesReturn = sumSymbolRead.Read();
+                        _symbolValues.AddRange(symbolValuesReturn);
                     });
                     cnt = 0;
                     symbolColl = new SymbolCollection();
@@ -392,8 +388,8 @@ namespace TwinCatVariableViewer
                 SumSymbolRead sumSymbolRead = new SumSymbolRead(plcCon.Connection, symbolColl);
                 await Task.Run(() =>
                 {
-                    object[] _symbolValuesReturn = sumSymbolRead.Read();
-                    _symbolValues.AddRange(_symbolValuesReturn);
+                    object[] symbolValuesReturn = sumSymbolRead.Read();
+                    _symbolValues.AddRange(symbolValuesReturn);
                 });
             }
             // Debug.WriteLine($"Collecting data from PLC: {sw.Elapsed}");
@@ -469,7 +465,7 @@ namespace TwinCatVariableViewer
                 {
                     using (var w = new StreamWriter($"VariableDump_{plcConnection.Session.Port}.csv"))
                     {
-                        string delimiter = ";";
+                        const string delimiter = ";";
                         for (var i = 0; i < _symbolValues.Count; i++)
                         {
                             w.WriteLine($"{plcConnection.Symbols[i].InstancePath}{delimiter}{plcConnection.Symbols[i].TypeName}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexGroup}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexOffset}{delimiter}{plcConnection.Symbols[i].Size}{delimiter}{_symbolValues[i]}");
@@ -498,9 +494,9 @@ namespace TwinCatVariableViewer
         /// </summary>
         /// <param name="txt">text to parse for unallowed xml characters</param>
         /// <returns>filtered text</returns>
-        private string ReplaceHexadecimalSymbols(string txt)
+        private static string ReplaceHexadecimalSymbols(string txt)
         {
-            string r = "[\x00-\x08\x0B\x0C\x0E-\x1F\x26]";
+            const string r = "[\x00-\x08\x0B\x0C\x0E-\x1F\x26]";
             return Regex.Replace(txt, r, "", RegexOptions.Compiled);
         }
 
@@ -531,7 +527,9 @@ namespace TwinCatVariableViewer
                 TextBlockDumpStatus.Text = text;
                 TextBlockDumpStatus.Foreground = new SolidColorBrush(fontColor);
             }));
-            if (!this.IsLoaded) SplashScreen.LoadingStatus(text);
+            bool isLoaded = false;
+            Application.Current.Dispatcher.Invoke(() => isLoaded = IsLoaded);
+            if (!isLoaded) SplashScreen.LoadingStatus(text);
         }
 
         private void ButtonReconnect_OnClick(object sender, RoutedEventArgs e)

@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Threading;
 
 namespace TwinCatVariableViewer
 {
@@ -7,11 +8,11 @@ namespace TwinCatVariableViewer
     /// </summary>
     public partial class SplashScreen : Window
     {
-        private static SplashScreen splashScreen = new SplashScreen();
+        private static readonly SplashScreen Splash = new SplashScreen();
 
         // Delegate to refresh UI elements
         private delegate void RefreshDelegate();
-        private static void Refresh(DependencyObject obj)
+        private static void Refresh(DispatcherObject obj)
         {
             obj.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render, (RefreshDelegate)delegate { });
         }
@@ -23,18 +24,18 @@ namespace TwinCatVariableViewer
 
         public static void BeginDisplay()
         {
-            splashScreen.Show();
+            Splash.Show();
         }
 
         public static void EndDisplay()
         {
-            splashScreen.Close();
+            Splash.Close();
         }
 
         public static void LoadingStatus(string status)
         {
-            splashScreen.LoadingStatusLabel.Content = status;
-            Refresh(splashScreen.LoadingStatusLabel);
+            Splash.LoadingStatusLabel.Content = status;
+            Refresh(Splash.LoadingStatusLabel);
         }
     }
 }

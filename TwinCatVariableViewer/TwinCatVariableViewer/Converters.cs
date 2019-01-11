@@ -52,12 +52,7 @@ namespace TwinCatVariableViewer
             var boolValue = System.Convert.ToBoolean(value);
             if (parameter?.ToString() == "Invert") boolValue = !boolValue;
 
-            if (boolValue)
-            {
-                return Visibility.Visible;
-            }
-
-            return Visibility.Hidden;
+            return boolValue ? Visibility.Visible : Visibility.Hidden;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -75,15 +70,12 @@ namespace TwinCatVariableViewer
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             ListViewItem item = (ListViewItem)value;
-            if (item != null)
-            {
-                ListView listView = ItemsControl.ItemsControlFromItemContainer(item) as ListView;
-                if (listView == null) return "";
-                int index = listView.ItemContainerGenerator.IndexFromContainer(item);
-                return index.ToString();
-            }
+            if (item == null) return "";
+            ListView listView = ItemsControl.ItemsControlFromItemContainer(item) as ListView;
+            if (listView == null) return "";
+            int index = listView.ItemContainerGenerator.IndexFromContainer(item);
+            return index.ToString();
 
-            return "";
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

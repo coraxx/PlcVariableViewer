@@ -14,7 +14,7 @@ namespace TwinCatVariableViewer
     {
         #region Variables
 
-        private AmsAddress _address;
+        private readonly AmsAddress _address;
         private readonly SymbolLoaderSettings _symbolLoaderSettings = new SymbolLoaderSettings(SymbolsLoadMode.VirtualTree, ValueAccessMode.IndexGroupOffsetPreferred);
         private ISymbolLoader _symbolLoader;
 
@@ -24,7 +24,7 @@ namespace TwinCatVariableViewer
 
         public AdsSession Session { get; private set; }
         public AdsConnection Connection { get; private set; }
-        public List<ISymbol> Symbols { get; private set; } = new List<ISymbol>();
+        public List<ISymbol> Symbols { get; } = new List<ISymbol>();
 
         private bool _connected;
         public bool Connected
@@ -88,7 +88,7 @@ namespace TwinCatVariableViewer
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                string port = (Session == null) ? String.Empty : $"Port {Session.Port}: ";
+                string port = Session == null ? string.Empty : $"Port {Session.Port}: ";
                 OnPlcConnectionError(new PlcConnectionErrorEventArgs($"{port}{ex.Message}"));
                 Disconnect();
             }
@@ -141,6 +141,6 @@ namespace TwinCatVariableViewer
             Message = message;
         }
 
-        public string Message { get; private set; }
+        public string Message { get; }
     }
 }
