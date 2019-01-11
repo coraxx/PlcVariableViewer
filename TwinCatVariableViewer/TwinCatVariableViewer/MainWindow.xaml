@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         DataContext="{Binding RelativeSource={RelativeSource Self}}"
         Title="TwinCat Variable Viewer" Height="650" Width="1080"
-        Loaded="MainWindow_OnLoaded">
+        Loaded="MainWindow_OnLoaded" Icon="TwinCatVariableViewer.ico">
 	
 	<Window.Resources>
 		<local:BoolToValueConverter x:Key="BoolToValueConverter"/>

@@ -27,9 +27,9 @@ namespace TwinCatVariableViewer
     /// </summary>
     public partial class MainWindow: INotifyPropertyChanged
     {
-        #region Global variables
+        #region Fields
         
-        private object[] _symbolValues;
+        private List<object> _symbolValues = new List<object>();
         private IEnumerable<int> _activePorts;
 
         private readonly DispatcherTimer _refreshDataTimer = new DispatcherTimer(DispatcherPriority.Render);
@@ -309,6 +309,8 @@ namespace TwinCatVariableViewer
             // Get scrollviewer
             Decorator border = VisualTreeHelper.GetChild(SymbolListView, 0) as Decorator;
             if (border != null) _scrollViewer = border.Child as ScrollViewer;
+
+            SplashScreen.EndDisplay();
         }
 
         private void RefreshDataTimerOnTick(object sender, EventArgs eventArgs)
@@ -358,20 +360,40 @@ namespace TwinCatVariableViewer
 
         private async Task ReadAll(PlcConnection plcCon)
         {
-            //Stopwatch sw = Stopwatch.StartNew();
-            SymbolCollection symbolColl = new SymbolCollection();
+            // Stopwatch sw = Stopwatch.StartNew();
+            _symbolValues.Clear();
 
+            // Split up load in packages of 500 Variables at once. More would be faster but stresses the PLC more.
+            SymbolCollection symbolColl = new SymbolCollection();
+            int cnt = 0;
             foreach (var symbol in plcCon.Symbols)
             {
+                if (cnt >= 500)
+                {
+                    SumSymbolRead sumSymbolRead = new SumSymbolRead(plcCon.Connection, symbolColl);
+                    await Task.Run(() =>
+                    {
+                        object[] _symbolValuesReturn = sumSymbolRead.Read();
+                        _symbolValues.AddRange(_symbolValuesReturn);
+                    });
+                    cnt = 0;
+                    symbolColl = new SymbolCollection();
+                }
                 symbolColl.Add(symbol);
+                cnt++;
             }
 
-            SumSymbolRead sumSymbolRead = new SumSymbolRead(plcCon.Connection, symbolColl);
-            await Task.Run(() =>
+            // Final sum symbol read for the rest in symbolColl
+            if (cnt != 0)
             {
-                _symbolValues = sumSymbolRead.Read();
-            });
-            //Debug.WriteLine($"Collecting data from PLC: {sw.Elapsed}");
+                SumSymbolRead sumSymbolRead = new SumSymbolRead(plcCon.Connection, symbolColl);
+                await Task.Run(() =>
+                {
+                    object[] _symbolValuesReturn = sumSymbolRead.Read();
+                    _symbolValues.AddRange(_symbolValuesReturn);
+                });
+            }
+            // Debug.WriteLine($"Collecting data from PLC: {sw.Elapsed}");
         }
 
         private async void ButtonDumpData_OnClick(object sender, RoutedEventArgs e)
@@ -395,7 +417,7 @@ namespace TwinCatVariableViewer
 
                 await ReadAll(plcConnection).ConfigureAwait(false);
 
-                if (_symbolValues.Length != plcConnection.Symbols.Count)
+                if (_symbolValues.Count != plcConnection.Symbols.Count)
                 {
                     UpdateDumpStatus("Error dumping data: Missmatch in symbol array sizes!", Colors.Red);
                     DumpSpinner(false);
@@ -411,7 +433,7 @@ namespace TwinCatVariableViewer
                         writer.WriteStartDocument();
                         writer.WriteStartElement("Symbols");
 
-                        for (var i = 0; i < _symbolValues.Length; i++)
+                        for (var i = 0; i < _symbolValues.Count; i++)
                         {
                             writer.WriteStartElement("Symbol");
 
@@ -445,7 +467,7 @@ namespace TwinCatVariableViewer
                     using (var w = new StreamWriter($"VariableDump_{plcConnection.Session.Port}.csv"))
                     {
                         string delimiter = ";";
-                        for (var i = 0; i < _symbolValues.Length; i++)
+                        for (var i = 0; i < _symbolValues.Count; i++)
                         {
                             w.WriteLine($"{plcConnection.Symbols[i].InstancePath}{delimiter}{plcConnection.Symbols[i].TypeName}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexGroup}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexOffset}{delimiter}{plcConnection.Symbols[i].Size}{delimiter}{_symbolValues[i]}");
                             w.Flush();

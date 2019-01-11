@@ -1,0 +1,28 @@
+﻿<Window x:Class="TwinCatVariableViewer.SplashScreen"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TwinCatVariableViewer"
+        mc:Ignorable="d"
+        Title="SplashScreen" Height="300" Width="500" AllowsTransparency="True"
+		Background="Transparent"
+		ResizeMode="NoResize" WindowStyle="None" WindowStartupLocation="CenterScreen"
+		Icon="TwinCatVariableViewer.ico">
+
+	<Grid x:Name="RootGrid" Background="#FF343434" Margin="10">
+		<Grid.Effect>
+			<DropShadowEffect BlurRadius="8" ShadowDepth="5" Opacity="0.4" />
+		</Grid.Effect>
+		<Image Source="TwinCatVariableViewer.ico" Width="120" Height="150" VerticalAlignment="Top" Margin="50">
+			<Image.Effect>
+				<DropShadowEffect BlurRadius="20" ShadowDepth="5" Opacity="0.4" />
+			</Image.Effect>
+		</Image>
+		<Label Content="Loading symbols..." Foreground="White" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="25">
+			<Label.Effect>
+				<DropShadowEffect BlurRadius="8" ShadowDepth="3" Opacity="0.4" />
+			</Label.Effect>
+		</Label>
+	</Grid>
+</Window>
