@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:TwinCatVariableViewer"
         mc:Ignorable="d"
         DataContext="{Binding RelativeSource={RelativeSource Self}}"
-        Title="TwinCat Variable Viewer" Height="650" Width="1080"
+        Title="TwinCAT Variable Viewer" Height="650" Width="1080"
         Loaded="MainWindow_OnLoaded" Icon="TwinCatVariableViewer.ico">
 	
 	<Window.Resources>

@@ -89,6 +89,7 @@ namespace TwinCatVariableViewer
         public MainWindow()
         {
             InitializeComponent();
+            Title = $"TwinCAT Variable Viewer - v{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString().TrimEnd('0').TrimEnd('.')}";
 
             _refreshDataTimer.Interval = TimeSpan.FromMilliseconds(200);
 
