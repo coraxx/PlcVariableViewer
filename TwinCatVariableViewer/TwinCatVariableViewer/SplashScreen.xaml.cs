@@ -7,7 +7,14 @@ namespace TwinCatVariableViewer
     /// </summary>
     public partial class SplashScreen : Window
     {
-        private static SplashScreen splash = new SplashScreen();
+        private static SplashScreen splashScreen = new SplashScreen();
+
+        // Delegate to refresh UI elements
+        private delegate void RefreshDelegate();
+        private static void Refresh(DependencyObject obj)
+        {
+            obj.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render, (RefreshDelegate)delegate { });
+        }
 
         public SplashScreen()
         {
@@ -16,12 +23,18 @@ namespace TwinCatVariableViewer
 
         public static void BeginDisplay()
         {
-            splash.Show();
+            splashScreen.Show();
         }
 
         public static void EndDisplay()
         {
-            splash.Close();
+            splashScreen.Close();
+        }
+
+        public static void LoadingStatus(string status)
+        {
+            splashScreen.LoadingStatusLabel.Content = status;
+            Refresh(splashScreen.LoadingStatusLabel);
         }
     }
 }

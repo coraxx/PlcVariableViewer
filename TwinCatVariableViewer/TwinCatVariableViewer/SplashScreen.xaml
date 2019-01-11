@@ -19,7 +19,7 @@
 				<DropShadowEffect BlurRadius="20" ShadowDepth="5" Opacity="0.4" />
 			</Image.Effect>
 		</Image>
-		<Label Content="Loading symbols..." Foreground="White" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="25">
+		<Label x:Name="LoadingStatusLabel" Content="TwinCat Variable Viewer" Foreground="White" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="25">
 			<Label.Effect>
 				<DropShadowEffect BlurRadius="8" ShadowDepth="3" Opacity="0.4" />
 			</Label.Effect>

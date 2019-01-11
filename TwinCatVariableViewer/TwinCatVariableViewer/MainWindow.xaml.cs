@@ -95,6 +95,7 @@ namespace TwinCatVariableViewer
             // check if twincat is installed
             if (CheckLibrary("tcadsdll.dll"))
             {
+                SplashScreen.LoadingStatus("Connecting to PLC");
                 ConnectPlc();
             }
             else
@@ -134,6 +135,7 @@ namespace TwinCatVariableViewer
 
             if (_plcConnections[_activePlc].Connected)
             {
+                UpdateDumpStatus("Retrieving symbols", Colors.GreenYellow);
                 PopulateListView();
             }
 
@@ -528,6 +530,7 @@ namespace TwinCatVariableViewer
                 TextBlockDumpStatus.Text = text;
                 TextBlockDumpStatus.Foreground = new SolidColorBrush(fontColor);
             }));
+            if (!this.IsLoaded) SplashScreen.LoadingStatus(text);
         }
 
         private void ButtonReconnect_OnClick(object sender, RoutedEventArgs e)
