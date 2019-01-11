@@ -17,11 +17,11 @@ namespace TwinCatVariableViewer
         {
             try
             {
-                if (symbol.DataType == null)
+                if (symbol.DataType == null && symbol.Category != DataTypeCategory.Struct)
                     return;
-                if (symbol.DataType.Name.StartsWith("TC2_MC2."))
+                if (symbol.DataType != null && symbol.DataType.Name.StartsWith("TC2_MC2."))
                     return;
-                if (symbol.TypeName == "TC2_MC2.MC_Power")
+                if (symbol.TypeName != null && symbol.TypeName == "TC2_MC2.MC_Power")
                     Console.WriteLine();
                 foreach (ITypeAttribute attribute in symbol.Attributes)
                 {
