@@ -71,6 +71,8 @@ namespace TwinCatVariableViewer
                     case DataTypeCategory.Reference:
                         // "REFERENCE TO ..." cannot be read, so filter it out. Comes from InOut variables in function blocks
                         // pass
+                        if (symbol.IsPointer || symbol.DataType.Name.StartsWith("POINTER"))
+                            break;
                         break;
                     default:
                         symbols.Add(symbol);

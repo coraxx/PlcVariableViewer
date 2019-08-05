@@ -74,7 +74,10 @@ namespace TwinCatVariableViewer
             }
         }
 
-            #endregion
+        public bool CsvExport { get; set; } = true;
+        public bool XmlExport { get; set; } = true;
+
+        #endregion
 
         #region Check if DLL exists
         [DllImport("kernel32", SetLastError = true)]
@@ -105,6 +108,12 @@ namespace TwinCatVariableViewer
                 ButtonReconnect.IsEnabled = false;
                 UpdateDumpStatus("Did not find tcadsdll.dll. Is TwinCat/ADS installed?!", Colors.Red);
             }
+
+            // Events
+            cbCsv.Checked += ExportOptionsCheck;
+            cbCsv.Unchecked += ExportOptionsCheck;
+            cbXml.Checked += ExportOptionsCheck;
+            cbXml.Unchecked += ExportOptionsCheck;
         }
 
         private void ConnectPlc()
@@ -424,63 +433,69 @@ namespace TwinCatVariableViewer
                 }
 
                 // Write xml
-                try
+                if (XmlExport)
                 {
-                    XmlWriterSettings settings = new XmlWriterSettings { Indent = true };
-                    using (XmlWriter writer = XmlWriter.Create($"VariableDump_{plcConnection.Session.Port}.xml", settings))
+                    try
                     {
-                        writer.WriteStartDocument();
-                        writer.WriteStartElement("Symbols");
-
-                        for (var i = 0; i < _symbolValues.Count; i++)
+                        XmlWriterSettings settings = new XmlWriterSettings { Indent = true };
+                        using (XmlWriter writer = XmlWriter.Create($"VariableDump_{plcConnection.Session.Port}.xml", settings))
                         {
-                            writer.WriteStartElement("Symbol");
+                            writer.WriteStartDocument();
+                            writer.WriteStartElement("Symbols");
 
-                            writer.WriteElementString("Path", ReplaceHexadecimalSymbols(plcConnection.Symbols[i].InstancePath));
-                            writer.WriteElementString("Type", ReplaceHexadecimalSymbols(plcConnection.Symbols[i].TypeName));
-                            writer.WriteElementString("IndexGroup", ReplaceHexadecimalSymbols(((IAdsSymbol)plcConnection.Symbols[i]).IndexGroup.ToString()));
-                            writer.WriteElementString("IndexOffset", ReplaceHexadecimalSymbols(((IAdsSymbol)plcConnection.Symbols[i]).IndexOffset.ToString()));
-                            writer.WriteElementString("Size", ReplaceHexadecimalSymbols(plcConnection.Symbols[i].Size.ToString()));
-                            writer.WriteElementString("CurrentValue", ReplaceHexadecimalSymbols(_symbolValues[i].ToString()));
+                            for (var i = 0; i < _symbolValues.Count; i++)
+                            {
+                                writer.WriteStartElement("Symbol");
+
+                                writer.WriteElementString("Path", ReplaceHexadecimalSymbols(plcConnection.Symbols[i].InstancePath));
+                                writer.WriteElementString("Type", ReplaceHexadecimalSymbols(plcConnection.Symbols[i].TypeName));
+                                writer.WriteElementString("IndexGroup", ReplaceHexadecimalSymbols(((IAdsSymbol)plcConnection.Symbols[i]).IndexGroup.ToString()));
+                                writer.WriteElementString("IndexOffset", ReplaceHexadecimalSymbols(((IAdsSymbol)plcConnection.Symbols[i]).IndexOffset.ToString()));
+                                writer.WriteElementString("Size", ReplaceHexadecimalSymbols(plcConnection.Symbols[i].Size.ToString()));
+                                writer.WriteElementString("CurrentValue", ReplaceHexadecimalSymbols(_symbolValues[i].ToString()));
+
+                                writer.WriteEndElement();
+                            }
 
                             writer.WriteEndElement();
+                            writer.WriteEndDocument();
                         }
-
-                        writer.WriteEndElement();
-                        writer.WriteEndDocument();
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(ex.Message);
-                    if (ex.Message.StartsWith("The process cannot access the file"))
-                        UpdateDumpStatus($"Cannot access 'VariableDump_{plcConnection.Session.Port}.xml'. Opened in another application?!", Colors.Orange);
-                    else UpdateDumpStatus(ex.Message, Colors.Orange);
-                    DumpSpinner(false);
-                    return;
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                        if (ex.Message.StartsWith("The process cannot access the file"))
+                            UpdateDumpStatus($"Cannot access 'VariableDump_{plcConnection.Session.Port}.xml'. Opened in another application?!", Colors.Orange);
+                        else UpdateDumpStatus(ex.Message, Colors.Orange);
+                        DumpSpinner(false);
+                        return;
+                    }
                 }
 
                 // Write csv
-                try
+                if (CsvExport)
                 {
-                    using (var w = new StreamWriter($"VariableDump_{plcConnection.Session.Port}.csv"))
+                    try
                     {
-                        const string delimiter = ";";
-                        for (var i = 0; i < _symbolValues.Count; i++)
+                        using (var w = new StreamWriter($"VariableDump_{plcConnection.Session.Port}.csv"))
                         {
-                            w.WriteLine($"{plcConnection.Symbols[i].InstancePath}{delimiter}{plcConnection.Symbols[i].TypeName}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexGroup}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexOffset}{delimiter}{plcConnection.Symbols[i].Size}{delimiter}{_symbolValues[i]}");
-                            w.Flush();
+                            const string delimiter = ";";
+                            for (var i = 0; i < _symbolValues.Count; i++)
+                            {
+                                w.WriteLine($"{plcConnection.Symbols[i].InstancePath}{delimiter}{plcConnection.Symbols[i].TypeName}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexGroup}{delimiter}{((IAdsSymbol)plcConnection.Symbols[i]).IndexOffset}{delimiter}{plcConnection.Symbols[i].Size}{delimiter}{_symbolValues[i]}");
+                                w.Flush();
+                            }
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(ex.Message);
-                    if (ex.Message.StartsWith("The process cannot access the file"))
-                        UpdateDumpStatus($"Cannot access 'VariableDump_{plcConnection.Session.Port}.csv'. Opened in another application?!", Colors.Orange);
-                    else UpdateDumpStatus(ex.Message, Colors.Orange);
-                    DumpSpinner(false);
-                    return;
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                        if (ex.Message.StartsWith("The process cannot access the file"))
+                            UpdateDumpStatus($"Cannot access 'VariableDump_{plcConnection.Session.Port}.csv'. Opened in another application?!", Colors.Orange);
+                        else UpdateDumpStatus(ex.Message, Colors.Orange);
+                        DumpSpinner(false);
+                        return;
+                    }
                 }
             }
 
@@ -548,6 +563,13 @@ namespace TwinCatVariableViewer
         {
             _activePlc = ComboBoxPlc.SelectedIndex >= 0 ? ComboBoxPlc.SelectedIndex : 0;
             PopulateListView();
+        }
+
+        private void ExportOptionsCheck(object sender, RoutedEventArgs e)
+        {
+            if (cbXml.IsChecked == null || cbCsv.IsChecked == null)
+                return;
+            ButtonDumpData.IsEnabled = (bool)cbXml.IsChecked || (bool)cbCsv.IsChecked;
         }
     }
 }
