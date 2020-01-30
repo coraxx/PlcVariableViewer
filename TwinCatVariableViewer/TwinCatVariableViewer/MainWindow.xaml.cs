@@ -206,7 +206,7 @@ namespace TwinCatVariableViewer
                     catch (Exception ex)
                     {
                         Debug.WriteLine(ex.Message);
-                        break;
+                        unsuccessfulAttempts++;
                     }
                 }
                 port++;
@@ -544,7 +544,7 @@ namespace TwinCatVariableViewer
             }));
             bool isLoaded = false;
             Application.Current.Dispatcher.Invoke(() => isLoaded = IsLoaded);
-            if (!isLoaded) SplashScreen.LoadingStatus(text);
+            if (!isLoaded) Application.Current.Dispatcher.Invoke(() => SplashScreen.LoadingStatus(text));
         }
 
         private void ButtonReconnect_OnClick(object sender, RoutedEventArgs e)
